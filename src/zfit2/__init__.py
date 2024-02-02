@@ -1,5 +1,4 @@
-"""
-Copyright (c) 2024 Jonas Eschle. All rights reserved.
+"""Copyright (c) 2024 Jonas Eschle. All rights reserved.
 
 zfit2: Scalable pythonic likelihood fitting for science
 """
