@@ -150,4 +150,3 @@ repos:
     rev: v9.0.0
     hooks:
       - id: oxipng
-
