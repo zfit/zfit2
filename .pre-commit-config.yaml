@@ -1,0 +1,141 @@
+ci:
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autofix_commit_msg: "style: pre-commit fixes"
+
+repos:
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: "1.16.0"
+    hooks:
+      - id: blacken-docs
+        additional_dependencies: [black==23.*]
+
+  - repo: https://github.com/sondrelg/pep585-upgrade
+    rev: 'v1.0'
+    hooks:
+      - id: upgrade-type-hints
+        args: [ '--futures=true' ]
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.3.1
+    hooks:
+      - id: pyupgrade
+        args: [ --py310-plus ]
+
+    # Notebook formatting
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.7.1
+    hooks:
+      - id: nbqa-isort
+        additional_dependencies: [ isort ]
+
+      - id: nbqa-pyupgrade
+        additional_dependencies: [ pyupgrade ]
+        args: [ --py310-plus ]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v4.5.0"
+    hooks:
+      - id: check-added-large-files
+        args: [ '--maxkb=1000' ]
+      - id: check-toml
+      - id: check-json
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: name-tests-test
+        args: ["--pytest-test-first"]
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+        files: ".*\\.(?:tex|py)$"
+      - id: detect-private-key
+      - id: fix-byte-order-marker
+      - id: check-ast
+      - id: check-docstring-first
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: "v1.10.0"
+    hooks:
+      - id: rst-backticks
+      - id: rst-directive-colons
+      - id: rst-inline-touching-normal
+      - id: python-use-type-annotations
+      - id: python-check-mock-methods
+      - id: python-no-eval
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: "v3.1.0"
+    hooks:
+      - id: prettier
+        types_or: [yaml, markdown, html, css, scss, javascript, json]
+        args: [--prose-wrap=always]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.1.14"
+    hooks:
+      - id: ruff
+        args: ["--fix", "--show-fixes"]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.8.0"
+    hooks:
+      - id: mypy
+        files: src|tests
+        args: []
+        additional_dependencies:
+          - pytest
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.2.6"
+    hooks:
+      - id: codespell
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: "v0.9.0.6"
+    hooks:
+      - id: shellcheck
+
+  - repo: local
+    hooks:
+      - id: disallow-caps
+        name: Disallow improper capitalization
+        language: pygrep
+        entry: PyBind|Numpy|Cmake|CCache|Github|PyTest
+        exclude: .pre-commit-config.yaml
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: "v0.16"
+    hooks:
+      - id: validate-pyproject
+        additional_dependencies: ["validate-pyproject-schema-store[all]"]
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: "0.27.3"
+    hooks:
+      - id: check-dependabot
+      - id: check-github-workflows
+      - id: check-github-actions
+      - id: check-readthedocs
+
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.7.5
+    hooks:
+      - id: docformatter
+        args: [ -r, --in-place, --wrap-descriptions, '120', --wrap-summaries, '120', --pre-summary-space, --black, -- ]
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.6.1
+    hooks:
+      - id: nbstripout
+  - repo: https://github.com/MarcoGorelli/auto-walrus
+    rev: v0.2.2
+    hooks:
+      - id: auto-walrus
+
+  - repo: https://github.com/shssoichiro/oxipng
+    rev: v9.0.0
+    hooks:
+      - id: oxipng
