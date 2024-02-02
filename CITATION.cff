@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+title: zfit
+message: scalable pythonic fitting
+type: software
+authors:
+  - given-names: Jonas TODO MORE AUTHORS
+    family-names: Eschle
+    email: jonas.eschle@cern.ch
+    name-particle: Jonas
+    orcid: 'https://orcid.org/0000-0002-7312-3699'
+identifiers:
+  - type: doi
+    value: 10.1016/j.softx.2020.100508
+    description: zfit original paper
+  - type: doi
+    value: 10.5281/zenodo.2602042
+    description: Software on zenodo
+repository-code: 'https://github.com/zfit/zfit'
+url: 'https://zfit.readthedocs.io/en/stable/'
+repository: 'https://github.com/zfit/zfit2'
+abstract: Scalable pythonic likelihood fitting
+keywords:
+  - fitting
+  - likelihood
+  - TensorFlow
+  - jax
+  - probability
+  - high energy physics
+license: BSD-3-Clause
+commit: 70f9d5e
+version: 0.18.0
+date-released: '2024-01-29'
