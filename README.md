@@ -11,7 +11,7 @@
 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 
-[![All Contributors][contributors-badge][#contributors-]
+[![All Contributors][contributors-badge](#contributors-)
 
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
