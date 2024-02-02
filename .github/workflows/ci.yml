@@ -32,8 +32,11 @@ jobs:
         run: |
           echo "::add-matcher::$GITHUB_WORKSPACE/.github/matchers/pylint.json"
           pipx run nox -s pylint
+      - uses: scientific-python/repo-review@v0.10.4
+        with:
+          plugins: sp-repo-review
 
-  checks:
+  tests:
     name: Check Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}
     needs: [pre-commit]
@@ -42,7 +45,6 @@ jobs:
       matrix:
         python-version: ["3.10", "3.12"]
         runs-on: [ubuntu-latest, macos-latest, windows-latest]
-
 
     steps:
       - uses: actions/checkout@v4

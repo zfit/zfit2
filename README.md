@@ -25,3 +25,16 @@
 [rtd-link]:                 https://zfit2.readthedocs.io/en/latest/?badge=latest
 
 <!-- prettier-ignore-end -->
+
+
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
