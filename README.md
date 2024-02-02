@@ -1,10 +1,6 @@
 # zfit2
 
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 
-[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
-
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 [![Actions Status][actions-badge]][actions-link]
 [![Documentation Status][rtd-badge]][rtd-link]
@@ -14,6 +10,12 @@
 [![PyPI platforms][pypi-platforms]][pypi-link]
 
 [![GitHub Discussion][github-discussions-badge]][github-discussions-link]
+
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+
+[![All Contributors][contributors-badge][#contributors-]
+
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 <!-- SPHINX-START -->
 
@@ -29,6 +31,7 @@
 [pypi-version]:             https://img.shields.io/pypi/v/zfit2
 [rtd-badge]:                https://readthedocs.org/projects/zfit2/badge/?version=latest
 [rtd-link]:                 https://zfit2.readthedocs.io/en/latest/?badge=latest
+[contributors-badge]:       https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square
 
 <!-- prettier-ignore-end -->
 
