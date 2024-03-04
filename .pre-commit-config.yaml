@@ -7,7 +7,7 @@ repos:
     rev: "1.16.0"
     hooks:
       - id: blacken-docs
-        additional_dependencies: [black==23.*]
+        additional_dependencies: [black]
 
   - repo: https://github.com/sondrelg/pep585-upgrade
     rev: "v1.0"
@@ -15,15 +15,9 @@ repos:
       - id: upgrade-type-hints
         args: ["--futures=true"]
 
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.1
-    hooks:
-      - id: pyupgrade
-        args: [--py310-plus]
-
     # Notebook formatting
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.7.1
+    rev: 1.8.3
     hooks:
       - id: nbqa-isort
         additional_dependencies: [isort]
