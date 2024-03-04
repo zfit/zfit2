@@ -30,9 +30,9 @@ def convert_to_variables(var):
 
 
 class Func:
-    def __init__(self, input, output):
-        self.input = convert_to_variables(input)
-        self.output = convert_to_variables(output)
+    def __init__(self, invars, outvars):
+        self.input = convert_to_variables(invars)
+        self.output = convert_to_variables(outvars)
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
