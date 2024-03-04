@@ -3,7 +3,6 @@
 zfit2: Scalable pythonic likelihood fitting for science
 """
 
-
 from __future__ import annotations
 
 from ._version import version as __version__
