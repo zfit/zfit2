@@ -17,7 +17,7 @@ repos:
 
     # Notebook formatting
   - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.8.3
+    rev: 1.8.4
     hooks:
       - id: nbqa-isort
         additional_dependencies: [isort]
@@ -68,7 +68,7 @@ repos:
         args: [--prose-wrap=always]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.3.0"
+    rev: "v0.3.2"
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
