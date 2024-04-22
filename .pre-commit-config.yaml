@@ -68,7 +68,7 @@ repos:
         args: [--prose-wrap=always]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.3.7"
+    rev: "v0.4.1"
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
@@ -144,6 +144,6 @@ repos:
       - id: auto-walrus
 
   - repo: https://github.com/shssoichiro/oxipng
-    rev: v9.0.0
+    rev: v9.1.0
     hooks:
       - id: oxipng
