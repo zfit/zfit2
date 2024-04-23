@@ -132,8 +132,6 @@ ignore = [
   "ISC001",   # Conflicts with formatter
 ]
 isort.required-imports = ["from __future__ import annotations"]
-# Uncomment if using a _compat.typing backport
-# typing-modules = ["zfit2._compat.typing"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
