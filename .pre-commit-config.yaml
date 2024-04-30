@@ -1,6 +1,7 @@
 ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   autofix_commit_msg: "style: pre-commit fixes"
+  autoupdate_schedule: quarterly
 
 repos:
   - repo: https://github.com/adamchainz/blacken-docs
@@ -67,24 +68,15 @@ repos:
         types_or: [yaml, markdown, html, css, scss, javascript, json]
         args: [--prose-wrap=always]
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.4.1"
+    
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.9.0"
     hooks:
-      - id: ruff
-        types_or: [python, pyi, jupyter]
-        args: [--fix, --unsafe-fixes, --show-fixes]
-      # Run the formatter.
-      - id: ruff-format
-        types_or: [python, pyi, jupyter]
-
-  #  - repo: https://github.com/pre-commit/mirrors-mypy
-  #    rev: "v1.8.0"
-  #    hooks:
-  #      - id: mypy
-  #        files: src|tests
-  #        args: []
-  #        additional_dependencies:
-  #          - pytest
+      - id: mypy
+        files: src|tests
+        args: []
+        additional_dependencies:
+          - pytest
 
   - repo: https://github.com/codespell-project/codespell
     rev: "v2.2.6"
@@ -143,7 +135,18 @@ repos:
     hooks:
       - id: auto-walrus
 
-  - repo: https://github.com/shssoichiro/oxipng
-    rev: v9.1.0
+  # uncomment locally if needed, currently needs rust version not available on pre-commit.ci
+  #  - repo: https://github.com/shssoichiro/oxipng
+  #    rev: v9.0.0
+  #    hooks:
+  #      - id: oxipng
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.4.1"
     hooks:
-      - id: oxipng
+      - id: ruff
+        types_or: [python, pyi, jupyter]
+        args: [--fix, --unsafe-fixes, --show-fixes]
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
