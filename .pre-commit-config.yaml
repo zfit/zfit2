@@ -2,6 +2,9 @@ ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   autofix_commit_msg: "style: pre-commit fixes"
   autoupdate_schedule: quarterly
+#  skip:
+#    - oxipng
+
 
 repos:
   - repo: https://github.com/adamchainz/blacken-docs
@@ -28,48 +31,71 @@ repos:
         args: [--py310-plus]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v5.0.0"
+    rev: v5.0.0
     hooks:
       - id: check-added-large-files
-        args: ["--maxkb=1000"]
-      - id: check-toml
-      - id: check-json
+        args: [ '--maxkb=1000' ]
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
       - id: check-yaml
+      - id: check-toml
+      - id: check-json
       - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending
-      - id: name-tests-test
-        args: ["--pytest-test-first"]
       - id: requirements-txt-fixer
       - id: trailing-whitespace
         files: ".*\\.(?:tex|py)$"
+        args: [ --markdown-linebreak-ext=md ]
+        exclude: (^notebooks/|^tests/truth/)
       - id: detect-private-key
       - id: fix-byte-order-marker
       - id: check-ast
       - id: check-docstring-first
+      - id: debug-statements
+
+
+  - repo: local
+    hooks:
+      - id: doc arg replacer
+        name: docarg
+        entry: utils/api/replace_argdocs.py
+        language: python
+        always_run: true
+        additional_dependencies: [ pyyaml ]
+
+  #  - repo: https://github.com/PyCQA/docformatter
+  #    rev: v1.7.5
+  #    hooks:
+  #      - id: docformatter
+  #        args: [ -r, --in-place, --wrap-descriptions, '120', --wrap-summaries, '120', -- ]
+
 
   - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: "v1.10.0"
+    rev: v1.10.0
     hooks:
-      - id: rst-backticks
-      - id: rst-directive-colons
-      - id: rst-inline-touching-normal
       - id: python-use-type-annotations
       - id: python-check-mock-methods
       - id: python-no-eval
+      - id: rst-backticks
+      - id: rst-directive-colons
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: "v4.0.0-alpha.8"
+  #  - repo: https://github.com/asottile/pyupgrade
+  #    rev: v3.3.1
+  #    hooks:
+  #      - id: pyupgrade
+  #        args: [ --py36-plus ]  # TODO: change fro 3.8? type annotations fail...
+
+  - repo: https://github.com/asottile/setup-cfg-fmt
+    rev: v2.8.0
     hooks:
-      - id: prettier
-        types_or: [yaml, markdown, html, css, scss, javascript, json]
-        args: [--prose-wrap=always]
+      - id: setup-cfg-fmt
+        args: [ --max-py-version=3.12, --include-version-classifiers ]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.15.0"
+  # Notebook formatting
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.15.1
     hooks:
       - id: mypy
         files: src|tests
@@ -82,10 +108,9 @@ repos:
     hooks:
       - id: codespell
 
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: "v0.10.0.1"
-    hooks:
-      - id: shellcheck
+      - id: nbqa-pyupgrade
+        additional_dependencies: [ pyupgrade ]
+        args: [ --py36-plus ]
 
   - repo: local
     hooks:
@@ -104,48 +129,55 @@ repos:
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: "0.32.1"
     hooks:
-      - id: check-dependabot
-      - id: check-github-workflows
-      - id: check-github-actions
-      - id: check-readthedocs
+      - id: check-manifest
+        args: [ --update, --no-build-isolation ]
+        additional_dependencies: [ setuptools-scm, setuptools-scm-git-archive ]
 
-  - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.5
-    hooks:
-      - id: docformatter
-        args:
-          [
-            -r,
-            --in-place,
-            --wrap-descriptions,
-            "120",
-            --wrap-summaries,
-            "120",
-            --pre-summary-space,
-            --black,
-            --,
-          ]
   - repo: https://github.com/kynan/nbstripout
     rev: 0.8.1
     hooks:
       - id: nbstripout
+
+  # TODO: 3.8+ only?
+  #  - repo: https://github.com/sondrelg/pep585-upgrade
+  #    rev: 'v1.0'
+  #    hooks:
+  #      - id: upgrade-type-hints
+  #        args: [ '--futures=true' ]
+
   - repo: https://github.com/MarcoGorelli/auto-walrus
     rev: 0.3.4
     hooks:
       - id: auto-walrus
 
-  # uncomment locally if needed, currently needs rust version not available on pre-commit.ci
+  # todo: needs rust, reactivate?
   #  - repo: https://github.com/shssoichiro/oxipng
-  #    rev: v9.0.0
+  #    rev: v8.0.0
   #    hooks:
   #      - id: oxipng
+
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.33.0
+    hooks:
+      - id: check-github-workflows
+      - id: check-github-actions
+      - id: check-dependabot
+      - id: check-readthedocs
+
+
+  - repo: https://github.com/dannysepler/rm_unneeded_f_str
+    rev: v0.2.0
+    hooks:
+      - id: rm-unneeded-f-str
+
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.11.4"
     hooks:
       - id: ruff
-        types_or: [python, pyi, jupyter]
-        args: [--fix, --unsafe-fixes, --show-fixes]
+        types_or: [ python, pyi, jupyter ]
+        args: [ --fix, --unsafe-fixes, --show-fixes , --line-length=120 ]
       # Run the formatter.
       - id: ruff-format
-        types_or: [python, pyi, jupyter]
+        types_or: [ python, pyi, jupyter ]
