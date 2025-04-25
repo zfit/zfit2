@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import jax.lax
 
 from .backend import numpy as znp
 from .diff import create_differentiator
@@ -88,8 +89,6 @@ class NLL(Statistics):
 
         # Set up constant subtraction
         self.constant_subtraction = constant_subtraction
-        self.constant = None
-        self.point_constants = None
 
         # Set up zero handling
         if zero_handling not in vars(ZeroHandler).values():
@@ -99,6 +98,24 @@ class NLL(Statistics):
         self.zero_handling = zero_handling
         self.epsilon = epsilon
         self.min_value = min_value
+
+        # Initialize constants for constant subtraction
+        self.constant = None
+        self.point_constants = None
+
+        # Calculate initial values for constant subtraction if needed
+        if constant_subtraction == "auto" or constant_subtraction == "per_point":
+            # Calculate pointwise log-likelihood once
+            pointwise = self.pointwise_loglik()
+
+            # For per-point subtraction, store the pointwise values
+            if constant_subtraction == "per_point":
+                self.point_constants = pointwise
+
+            # For auto subtraction, calculate and store the sum
+            if constant_subtraction == "auto":
+                # Use direct sum for initialization
+                self.constant = znp.sum(pointwise)
 
     def pointwise_loglik(
             self, params: Optional[Mapping[str, Union[float, np.ndarray]]] = None
@@ -201,12 +218,8 @@ class NLL(Statistics):
 
         # Apply per-point constant subtraction if enabled
         if self.constant_subtraction == "per_point":
-            # Use the existing point_constants if available, otherwise use pointwise
-            # In JAX, we don't modify state, so we use the value directly
-            point_constants = pointwise
-            if self.point_constants is not None:
-                point_constants = self.point_constants
-            pointwise = pointwise - point_constants
+            # Use the pre-calculated point_constants
+            pointwise = pointwise - self.point_constants
 
         # Special handling for ZeroHandler.IGNORE case
         if self.zero_handling == ZeroHandler.IGNORE:
@@ -237,12 +250,8 @@ class NLL(Statistics):
         if isinstance(self.constant_subtraction, (int, float)):
             result = result - self.constant_subtraction
         elif self.constant_subtraction == "auto":
-            # Use the existing constant if available, otherwise use result
-            # In JAX, we don't modify state, so we use the value directly
-            constant = result
-            if self.constant is not None:
-                constant = self.constant
-            result = result - constant
+            # Use the pre-calculated constant
+            result = result - self.constant
 
         return result
 
@@ -440,28 +449,41 @@ class NLL(Statistics):
         initial = (znp.array(0.0), znp.array(0.0))
 
         # Use JAX's scan for a functional implementation
-        (sum_val, _), _ = znp.scan(kahan_step, initial, values)
+        (sum_val, _), _ = jax.lax.scan(kahan_step, initial, values)
 
         return sum_val
 
-    def _neumaier_sum(self, values: np.ndarray) -> float:
+    def _neumaier_sum(self, values: np.ndarray) -> Union[float, np.ndarray]:
         """Calculate sum using Neumaier's algorithm (improved Kahan).
 
         This algorithm is more robust when adding values with large magnitude differences.
+        Implemented using JAX's scan for functional programming compatibility.
         """
-        sum_val = 0.0
-        compensation = 0.0
+        # Define a step function for Neumaier summation
+        def neumaier_step(carry, val):
+            sum_val, compensation = carry
 
-        for val in values:
+            # Add value to sum
             temp_sum = sum_val + val
-            # If sum_val is larger, low-order bits of val are lost
-            if abs(sum_val) >= abs(val):
-                compensation += (sum_val - temp_sum) + val
-            # If val is larger, low-order bits of sum_val are lost
-            else:
-                compensation += (val - temp_sum) + sum_val
-            sum_val = temp_sum
 
+            # Calculate compensation term
+            # If sum_val is larger, low-order bits of val are lost
+            # If val is larger, low-order bits of sum_val are lost
+            new_compensation = znp.where(
+                znp.abs(sum_val) >= znp.abs(val),
+                compensation + ((sum_val - temp_sum) + val),
+                compensation + ((val - temp_sum) + sum_val)
+            )
+
+            return (temp_sum, new_compensation), None
+
+        # Initial state: (sum, compensation)
+        initial = (znp.array(0.0), znp.array(0.0))
+
+        # Use JAX's scan for a functional implementation
+        (sum_val, compensation), _ = jax.lax.scan(neumaier_step, initial, values)
+
+        # Add the compensation to the final sum
         return sum_val + compensation
 
     def _logsumexp_sum(self, values: np.ndarray) -> Union[float, np.ndarray]:
