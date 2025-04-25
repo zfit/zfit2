@@ -34,6 +34,14 @@ class Parameter(Variable):
         """Convert to a list of parameters."""
         return Parameters(self)
 
+    def __float__(self):
+        """Convert the variable to a float."""
+        return float(self.value)
+
+    def __array__(self):
+        """Convert the variable to a numpy array."""
+        return znp.array(self.value)
+
 
 class Parameters(Variables):
     def __init__(self, params):
