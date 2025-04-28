@@ -10,7 +10,9 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import jax
 import jax.lax
+import jax.numpy as jnp
 
 from .backend import numpy as znp
 from .diff import create_differentiator
@@ -792,3 +794,92 @@ class OptimizedNLL(NLL):
 
         # Return the JAX array directly without converting to float
         return -self.sum_loglik(params, method=method)
+
+
+# JAX PyTree registration for NLL class
+def _nll_flatten(nll: NLL) -> Tuple[Tuple, Dict[str, Any]]:
+    """Flatten an NLL for JAX PyTree."""
+    # No dynamic values to track as children
+    children = ()
+    aux_data = {
+        "distribution": nll.distribution,
+        "data": nll.data,
+        "name": nll.name,
+        "use_jax": nll.differentiator.use_jax,
+        "constant_subtraction": nll.constant_subtraction,
+        "zero_handling": nll.zero_handling,
+        "epsilon": nll.epsilon,
+        "min_value": nll.min_value,
+        "constant": nll.constant,
+        "point_constants": nll.point_constants,
+    }
+    return children, aux_data
+
+def _nll_unflatten(aux_data: Dict[str, Any], children: Tuple) -> NLL:
+    """Unflatten an NLL from JAX PyTree."""
+    nll = NLL(
+        distribution=aux_data["distribution"],
+        data=aux_data["data"],
+        name=aux_data["name"],
+        use_jax=aux_data["use_jax"],
+        constant_subtraction=aux_data["constant_subtraction"],
+        zero_handling=aux_data["zero_handling"],
+        epsilon=aux_data["epsilon"],
+        min_value=aux_data["min_value"],
+    )
+    # Restore the constants
+    nll.constant = aux_data["constant"]
+    nll.point_constants = aux_data["point_constants"]
+    return nll
+
+# Register NLL class with JAX
+jax.tree_util.register_pytree_node(
+    NLL,
+    _nll_flatten,
+    _nll_unflatten
+)
+
+# JAX PyTree registration for OptimizedNLL class
+def _optimized_nll_flatten(nll: OptimizedNLL) -> Tuple[Tuple, Dict[str, Any]]:
+    """Flatten an OptimizedNLL for JAX PyTree."""
+    # No dynamic values to track as children
+    children = ()
+    aux_data = {
+        "distribution": nll.distribution,
+        "data": nll.data,
+        "name": nll.name,
+        "use_jax": nll.differentiator.use_jax,
+        "constant_subtraction": nll.constant_subtraction,
+        "zero_handling": nll.zero_handling,
+        "epsilon": nll.epsilon,
+        "min_value": nll.min_value,
+        "constant": nll.constant,
+        "point_constants": nll.point_constants,
+        "sum_method": nll.sum_method,
+    }
+    return children, aux_data
+
+def _optimized_nll_unflatten(aux_data: Dict[str, Any], children: Tuple) -> OptimizedNLL:
+    """Unflatten an OptimizedNLL from JAX PyTree."""
+    nll = OptimizedNLL(
+        distribution=aux_data["distribution"],
+        data=aux_data["data"],
+        name=aux_data["name"],
+        use_jax=aux_data["use_jax"],
+        constant_subtraction=aux_data["constant_subtraction"],
+        zero_handling=aux_data["zero_handling"],
+        epsilon=aux_data["epsilon"],
+        min_value=aux_data["min_value"],
+        sum_method=aux_data["sum_method"],
+    )
+    # Restore the constants
+    nll.constant = aux_data["constant"]
+    nll.point_constants = aux_data["point_constants"]
+    return nll
+
+# Register OptimizedNLL class with JAX
+jax.tree_util.register_pytree_node(
+    OptimizedNLL,
+    _optimized_nll_flatten,
+    _optimized_nll_unflatten
+)

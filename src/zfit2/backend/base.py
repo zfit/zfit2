@@ -1,271 +1,377 @@
-"""Backend for zfit2.
-
-This module provides a unified interface to different computational backends.
-"""
+"""Base class for backend implementations."""
 from __future__ import annotations
 
-import importlib.util
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
-from .base import BackendBase
-from .errors import BackendError, NotImplementedInBackend
+import numpy as np
 
+from .errors import NotImplementedInBackend
 
-class Backend(BackendBase):
-    """Backend for zfit2 - compatibility layer for existing code.
+# Type variables for PyTree operations
+T = TypeVar('T')
+U = TypeVar('U')
 
-    This class is maintained for backwards compatibility and will be
-    replaced by the new backend system in the future.
-    """
-
-    def __init__(self, backend_name: str = None):
-        """Initialize with the specified backend.
-
-        Args:
-            backend_name: The name of the backend to use.
-                If None, JAX will be used if available, otherwise NumPy.
-        """
-        from . import get_backend
-        self._backend = get_backend(backend_name)
-
+class BackendBase(ABC):
+    """Base class for all backend implementations."""
+    
     @property
+    @abstractmethod
     def name(self) -> str:
         """Return the name of the backend."""
-        return self._backend.name
-
-    def __repr__(self) -> str:
-        return f"{self._backend.name}Backend"
-
-    def __str__(self) -> str:
-        return f"{self._backend.name}Backend"
-
+        pass
+    
+    @abstractmethod
     def __getattr__(self, name: str) -> Any:
-        """Get an attribute from the backend."""
-        return getattr(self._backend, name)
-
+        """Get an attribute from the backend module."""
+        pass
+    
     # Core array creation functions
-    def array(self, obj, dtype=None, copy=None) -> Any:
+    @abstractmethod
+    def array(self, obj, dtype=None, copy=None, device=None) -> Any:
         """Create an array."""
-        return self._backend.array(obj, dtype=dtype, copy=copy)
-
-    def asarray(self, a, dtype=None, copy=None) -> Any:
+        pass
+    
+    @abstractmethod
+    def asarray(self, a, dtype=None, copy=None, device=None) -> Any:
         """Convert the input to an array."""
-        return self._backend.asarray(a, dtype=dtype, copy=copy)
-
-    def zeros(self, shape, dtype=None) -> Any:
+        pass
+    
+    @abstractmethod
+    def zeros(self, shape, dtype=None, device=None) -> Any:
         """Return a new array of given shape and type, filled with zeros."""
-        return self._backend.zeros(shape, dtype=dtype)
-
-    def ones(self, shape, dtype=None) -> Any:
+        pass
+    
+    @abstractmethod
+    def ones(self, shape, dtype=None, device=None) -> Any:
         """Return a new array of given shape and type, filled with ones."""
-        return self._backend.ones(shape, dtype=dtype)
-
-    def full(self, shape, fill_value, dtype=None) -> Any:
+        pass
+    
+    @abstractmethod
+    def full(self, shape, fill_value, dtype=None, device=None) -> Any:
         """Return a new array of given shape and type, filled with fill_value."""
-        return self._backend.full(shape, fill_value, dtype=dtype)
-
+        pass
+    
     # Math operations
+    @abstractmethod
     def sum(self, a, axis=None, dtype=None, keepdims=False) -> Any:
         """Sum of array elements over given axes."""
-        return self._backend.sum(a, axis=axis, dtype=dtype, keepdims=keepdims)
-
+        pass
+    
+    @abstractmethod
     def exp(self, x) -> Any:
         """Calculate the exponential of all elements in the input array."""
-        return self._backend.exp(x)
-
+        pass
+    
+    @abstractmethod
     def log(self, x) -> Any:
         """Natural logarithm, element-wise."""
-        return self._backend.log(x)
-
+        pass
+    
+    @abstractmethod
     def sin(self, x) -> Any:
         """Sine, element-wise."""
-        return self._backend.sin(x)
-
+        pass
+    
+    @abstractmethod
     def cos(self, x) -> Any:
         """Cosine, element-wise."""
-        return self._backend.cos(x)
-
+        pass
+    
+    @abstractmethod
     def tan(self, x) -> Any:
         """Tangent, element-wise."""
-        return self._backend.tan(x)
-
+        pass
+    
+    @abstractmethod
     def arcsin(self, x) -> Any:
         """Inverse sine, element-wise."""
-        return self._backend.arcsin(x)
-
+        pass
+    
+    @abstractmethod
     def arccos(self, x) -> Any:
         """Inverse cosine, element-wise."""
-        return self._backend.arccos(x)
-
+        pass
+    
+    @abstractmethod
     def arctan(self, x) -> Any:
         """Inverse tangent, element-wise."""
-        return self._backend.arctan(x)
-
+        pass
+    
+    @abstractmethod
     def sinh(self, x) -> Any:
         """Hyperbolic sine, element-wise."""
-        return self._backend.sinh(x)
-
+        pass
+    
+    @abstractmethod
     def cosh(self, x) -> Any:
         """Hyperbolic cosine, element-wise."""
-        return self._backend.cosh(x)
-
+        pass
+    
+    @abstractmethod
     def tanh(self, x) -> Any:
         """Hyperbolic tangent, element-wise."""
-        return self._backend.tanh(x)
-
+        pass
+    
+    @abstractmethod
     def arcsinh(self, x) -> Any:
         """Inverse hyperbolic sine, element-wise."""
-        return self._backend.arcsinh(x)
-
+        pass
+    
+    @abstractmethod
     def arccosh(self, x) -> Any:
         """Inverse hyperbolic cosine, element-wise."""
-        return self._backend.arccosh(x)
-
+        pass
+    
+    @abstractmethod
     def arctanh(self, x) -> Any:
         """Inverse hyperbolic tangent, element-wise."""
-        return self._backend.arctanh(x)
-
+        pass
+    
+    @abstractmethod
     def power(self, x1, x2) -> Any:
         """First array elements raised to powers from second array, element-wise."""
-        return self._backend.power(x1, x2)
-
+        pass
+    
+    @abstractmethod
     def sqrt(self, x) -> Any:
         """Return the non-negative square-root of an array, element-wise."""
-        return self._backend.sqrt(x)
-
+        pass
+    
+    @abstractmethod
     def square(self, x) -> Any:
         """Return the element-wise square of the input."""
-        return self._backend.square(x)
-
+        pass
+    
+    @abstractmethod
     def absolute(self, x) -> Any:
         """Calculate the absolute value element-wise."""
-        return self._backend.absolute(x)
-
+        pass
+    
+    @abstractmethod
     def mean(self, a, axis=None, dtype=None, keepdims=False) -> Any:
         """Compute the arithmetic mean along the specified axis."""
-        return self._backend.mean(a, axis=axis, dtype=dtype, keepdims=keepdims)
-
+        pass
+    
+    @abstractmethod
     def var(self, a, axis=None, dtype=None, ddof=0, keepdims=False) -> Any:
         """Compute the variance along the specified axis."""
-        return self._backend.var(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
-
+        pass
+    
+    @abstractmethod
     def std(self, a, axis=None, dtype=None, ddof=0, keepdims=False) -> Any:
         """Compute the standard deviation along the specified axis."""
-        return self._backend.std(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
-
+        pass
+    
+    @abstractmethod
     def min(self, a, axis=None, keepdims=False) -> Any:
         """Return minimum of an array or minimum along an axis."""
-        return self._backend.min(a, axis=axis, keepdims=keepdims)
-
+        pass
+    
+    @abstractmethod
     def max(self, a, axis=None, keepdims=False) -> Any:
         """Return maximum of an array or maximum along an axis."""
-        return self._backend.max(a, axis=axis, keepdims=keepdims)
-
+        pass
+    
+    @abstractmethod
     def argmin(self, a, axis=None) -> Any:
         """Return indices of the minimum values along the given axis."""
-        return self._backend.argmin(a, axis=axis)
-
+        pass
+    
+    @abstractmethod
     def argmax(self, a, axis=None) -> Any:
         """Return indices of the maximum values along the given axis."""
-        return self._backend.argmax(a, axis=axis)
-
+        pass
+    
+    @abstractmethod
     def clip(self, a, a_min, a_max) -> Any:
         """Clip (limit) the values in an array."""
-        return self._backend.clip(a, a_min, a_max)
-
+        pass
+    
+    @abstractmethod
     def round(self, a, decimals=0) -> Any:
         """Round an array to the given number of decimals."""
-        return self._backend.round(a, decimals=decimals)
-
+        pass
+    
+    @abstractmethod
     def dot(self, a, b) -> Any:
         """Dot product of two arrays."""
-        return self._backend.dot(a, b)
-
+        pass
+    
+    @abstractmethod
     def tensordot(self, a, b, axes=2) -> Any:
         """Compute tensor dot product along specified axes."""
-        return self._backend.tensordot(a, b, axes=axes)
-
+        pass
+    
+    @abstractmethod
     def matmul(self, a, b) -> Any:
         """Matrix product of two arrays."""
-        return self._backend.matmul(a, b)
-
+        pass
+    
     # Statistical functions
-    def normal(self, loc=0.0, scale=1.0, size=None, dtype=None, key=None) -> Any:
+    @abstractmethod
+    def normal(self, key=None, shape=None, dtype=None, loc=0.0, scale=1.0) -> Any:
         """Draw random samples from a normal distribution."""
-        return self._backend.normal(loc=loc, scale=scale, size=size, dtype=dtype, key=key)
-
-    def uniform(self, low=0.0, high=1.0, size=None, dtype=None, key=None) -> Any:
+        pass
+    
+    @abstractmethod
+    def uniform(self, key=None, shape=None, dtype=None, minval=0.0, maxval=1.0) -> Any:
         """Draw random samples from a uniform distribution."""
-        return self._backend.uniform(low=low, high=high, size=size, dtype=dtype, key=key)
-
+        pass
+    
+    @abstractmethod
+    def random_split(self, key, num=2) -> Any:
+        """Split a PRNG key into multiple keys."""
+        pass
+    
     # Linear algebra operations
+    @abstractmethod
     def inv(self, a) -> Any:
         """Compute the inverse of a matrix."""
-        return self._backend.inv(a)
-
+        pass
+    
+    @abstractmethod
     def eigh(self, a) -> Tuple[Any, Any]:
         """Return eigenvalues and eigenvectors of a Hermitian or symmetric matrix."""
-        return self._backend.eigh(a)
-
+        pass
+    
+    @abstractmethod
     def cholesky(self, a) -> Any:
         """Cholesky decomposition."""
-        return self._backend.cholesky(a)
-
+        pass
+    
+    @abstractmethod
     def solve(self, a, b) -> Any:
         """Solve a linear matrix equation, or system of linear scalar equations."""
-        return self._backend.solve(a, b)
-
+        pass
+    
     # Differential operations
+    @abstractmethod
     def grad(self, fun: Callable, argnums: Union[int, Sequence[int]] = 0) -> Callable:
         """Return a function to compute the gradient of `fun` with respect to positional arguments."""
-        return self._backend.grad(fun, argnums=argnums)
-
+        pass
+    
+    @abstractmethod
+    def value_and_grad(self, fun: Callable, argnums: Union[int, Sequence[int]] = 0) -> Callable:
+        """Return a function that evaluates both fun and its gradient."""
+        pass
+    
+    @abstractmethod
     def hessian(self, fun: Callable, argnums: Union[int, Sequence[int]] = 0) -> Callable:
         """Return a function to compute the Hessian of `fun` with respect to positional arguments."""
-        return self._backend.hessian(fun, argnums=argnums)
-
+        pass
+    
+    @abstractmethod
     def jacobian(self, fun: Callable, argnums: Union[int, Sequence[int]] = 0) -> Callable:
         """Return a function to compute the Jacobian of `fun` with respect to positional arguments."""
-        return self._backend.jacobian(fun, argnums=argnums)
-
+        pass
+    
+    @abstractmethod
+    def custom_jvp(self, fun: Callable, jvp: Optional[Callable] = None) -> Callable:
+        """Specify a custom JVP rule for a function."""
+        pass
+    
+    @abstractmethod
+    def custom_vjp(self, fun: Callable, fwd: Optional[Callable] = None, bwd: Optional[Callable] = None) -> Callable:
+        """Specify a custom VJP rule for a function."""
+        pass
+    
     # Array manipulation
+    @abstractmethod
     def reshape(self, a, newshape) -> Any:
         """Gives a new shape to an array without changing its data."""
-        return self._backend.reshape(a, newshape)
-
+        pass
+    
+    @abstractmethod
     def transpose(self, a, axes=None) -> Any:
         """Permute the dimensions of an array."""
-        return self._backend.transpose(a, axes=axes)
-
+        pass
+    
+    @abstractmethod
     def concatenate(self, arrays, axis=0) -> Any:
         """Join a sequence of arrays along an existing axis."""
-        return self._backend.concatenate(arrays, axis=axis)
-
+        pass
+    
+    @abstractmethod
     def stack(self, arrays, axis=0) -> Any:
         """Join a sequence of arrays along a new axis."""
-        return self._backend.stack(arrays, axis=axis)
-
+        pass
+    
+    @abstractmethod
     def vstack(self, tup) -> Any:
         """Stack arrays in sequence vertically (row wise)."""
-        return self._backend.vstack(tup)
-
+        pass
+    
+    @abstractmethod
     def hstack(self, tup) -> Any:
         """Stack arrays in sequence horizontally (column wise)."""
-        return self._backend.hstack(tup)
-
+        pass
+    
+    @abstractmethod
     def where(self, condition, x=None, y=None) -> Any:
         """Return elements chosen from `x` or `y` depending on `condition`."""
-        return self._backend.where(condition, x, y)
-
+        pass
+    
+    # Control flow operations
+    @abstractmethod
+    def scan(self, f, init, xs, length=None, reverse=False) -> Any:
+        """Scan a function over leading array axes while carrying along state."""
+        pass
+    
+    # PyTree operations
+    @abstractmethod
+    def tree_map(self, f: Callable[[T], U], tree: T, *rest: Any) -> U:
+        """Map a function over a pytree."""
+        pass
+    
+    @abstractmethod
+    def tree_flatten(self, tree: T) -> Tuple[List[Any], Any]:
+        """Flatten a pytree into a list of leaves and a treedef."""
+        pass
+    
+    @abstractmethod
+    def tree_unflatten(self, treedef: Any, leaves: List[Any]) -> Any:
+        """Unflatten a list of leaves and a treedef into a pytree."""
+        pass
+    
+    # Transformations
+    @abstractmethod
+    def jit(self, fun: Callable, static_argnums: Union[int, Sequence[int]] = ()) -> Callable:
+        """JIT-compile a function for faster execution."""
+        pass
+    
+    @abstractmethod
+    def vmap(self, fun: Callable, in_axes=0, out_axes=0) -> Callable:
+        """Vectorize a function along the specified axes."""
+        pass
+    
+    @abstractmethod
+    def pmap(self, fun: Callable, axis_name=None, devices=None) -> Callable:
+        """Parallel map over an axis."""
+        pass
+    
+    @abstractmethod
+    def checkpoint(self, fun: Callable, concrete: bool = False) -> Callable:
+        """Checkpoint a function to save memory during backpropagation."""
+        pass
+    
     # Other standard functions
+    @abstractmethod
     def sign(self, x) -> Any:
         """Returns an element-wise indication of the sign of a number."""
-        return self._backend.sign(x)
-
+        pass
+        
+    @abstractmethod
     def floor(self, x) -> Any:
         """Return the floor of the input, element-wise."""
-        return self._backend.floor(x)
-
+        pass
+    
+    @abstractmethod
     def ceil(self, x) -> Any:
         """Return the ceiling of the input, element-wise."""
-        return self._backend.ceil(x)
+        pass
+    
+    # Helper methods
+    def _not_implemented(self, func_name: str) -> Any:
+        """Raise NotImplementedInBackend error."""
+        raise NotImplementedInBackend(func_name, self.name)

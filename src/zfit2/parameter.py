@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import jax
+import jax.numpy as jnp
+
 from .backend import numpy as znp
 from .variable import Variable, Variables
 
@@ -58,6 +63,10 @@ class Parameters(Variables):
         """Return the list of parameters."""
         return self.variables
 
+    def __len__(self):
+        """Return the number of parameters."""
+        return len(self.params)
+
     def values(self):
         """Return the values of the parameters."""
         return znp.array([param.value for param in self.params])
@@ -68,7 +77,8 @@ class Parameters(Variables):
 
     def stepsizes(self):
         """Return the stepsizes of the parameters."""
-        return znp.array([param.stepsize for param in self.params])
+        # Convert to numpy array with float64 dtype to match test expectations
+        return znp.array([param.stepsize for param in self.params], dtype=jnp.float64)
 
     def __add__(self, other):
         """Add two Parameters or Parameters objects."""
@@ -87,3 +97,41 @@ class Parameters(Variables):
     def __array__(self):
         """Return the values of the parameters as a numpy array."""
         return self.values()
+
+
+# JAX PyTree registration for Parameter class
+def _parameter_flatten(param: Parameter) -> Tuple[Tuple[float], Dict[str, Any]]:
+    """Flatten a Parameter for JAX PyTree."""
+    # The value is dynamic
+    children = (param.value,)
+    aux_data = {
+        "name": param.name,
+        "label": param.label,
+        "lower": param.lower,
+        "upper": param.upper,
+        "stepsize": param.stepsize,
+        "prior": param.prior,
+        "fixed": param.fixed,
+    }
+    return children, aux_data
+
+def _parameter_unflatten(aux_data: Dict[str, Any], children: Tuple[float]) -> Parameter:
+    """Unflatten a Parameter from JAX PyTree."""
+    value, = children
+    return Parameter(
+        name=aux_data["name"],
+        value=value,
+        lower=aux_data["lower"],
+        upper=aux_data["upper"],
+        stepsize=aux_data["stepsize"],
+        prior=aux_data["prior"],
+        fixed=aux_data["fixed"],
+        label=aux_data["label"],
+    )
+
+# Register Parameter class with JAX
+jax.tree_util.register_pytree_node(
+    Parameter,
+    _parameter_flatten,
+    _parameter_unflatten
+)

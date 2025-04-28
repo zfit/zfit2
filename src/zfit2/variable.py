@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import jax
+import jax.numpy as jnp
+
 from .backend import numpy as znp
 
 
@@ -54,3 +59,33 @@ def convert_to_variables(var):
     if isinstance(var, list | tuple):
         return Variables([convert_to_variables(v) for v in var])
     raise NotImplementedError
+
+
+# JAX PyTree registration for Variable class
+def _variable_flatten(var: Variable) -> Tuple[Tuple, Dict[str, Any]]:
+    """Flatten a Variable for JAX PyTree."""
+    # No dynamic values to track as children
+    children = ()
+    aux_data = {
+        "name": var.name,
+        "label": var.label,
+        "lower": var.lower,
+        "upper": var.upper,
+    }
+    return children, aux_data
+
+def _variable_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Variable:
+    """Unflatten a Variable from JAX PyTree."""
+    return Variable(
+        name=aux_data["name"],
+        label=aux_data["label"],
+        lower=aux_data["lower"],
+        upper=aux_data["upper"],
+    )
+
+# Register Variable class with JAX
+jax.tree_util.register_pytree_node(
+    Variable,
+    _variable_flatten,
+    _variable_unflatten
+)
