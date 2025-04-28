@@ -223,6 +223,14 @@ class NumPyBackend(BackendBase):
             shape = ()
         return self._rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
 
+    def random_seed(self, seed=None) -> None:
+        """Set the random seed for the random number generator.
+
+        Args:
+            seed: The seed to use. If None, a random seed will be used.
+        """
+        self._rng = np.random.default_rng(seed)
+
     def random_split(self, key, num=2) -> Any:
         """Split a PRNG key into multiple keys.
 
@@ -240,6 +248,72 @@ class NumPyBackend(BackendBase):
         new_keys = np.random.randint(0, 2**31, size=num)
 
         return new_keys
+
+    def choice(self, a, shape=None, replace=True, p=None, key=None) -> Any:
+        """Random choice from an array.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        return self._rng.choice(a, size=shape, replace=replace, p=p)
+
+    def permutation(self, x, key=None) -> Any:
+        """Randomly permute a sequence, or return a permuted range.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        return self._rng.permutation(x)
+
+    def shuffle(self, x, key=None) -> None:
+        """Modify a sequence in-place by shuffling its contents.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        self._rng.shuffle(x)
+
+    def exponential(self, scale=1.0, shape=None, dtype=None, key=None) -> Any:
+        """Draw samples from an exponential distribution.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        if shape is None:
+            shape = ()
+        return self._rng.exponential(scale=scale, size=shape).astype(dtype)
+
+    def poisson(self, lam=1.0, shape=None, dtype=None, key=None) -> Any:
+        """Draw samples from a Poisson distribution.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        if shape is None:
+            shape = ()
+        return self._rng.poisson(lam=lam, size=shape).astype(dtype)
+
+    def beta(self, a, b, shape=None, dtype=None, key=None) -> Any:
+        """Draw samples from a Beta distribution.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        if shape is None:
+            shape = ()
+        return self._rng.beta(a=a, b=b, size=shape).astype(dtype)
+
+    def gamma(self, shape, scale=1.0, size=None, dtype=None, key=None) -> Any:
+        """Draw samples from a Gamma distribution.
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        if size is None:
+            size = ()
+        return self._rng.gamma(shape=shape, scale=scale, size=size).astype(dtype)
+
+    def randint(self, low, high=None, shape=None, dtype=None, key=None) -> Any:
+        """Return random integers from low (inclusive) to high (exclusive).
+
+        For compatibility with JAX, we accept a 'key' parameter, but it's ignored.
+        """
+        if shape is None:
+            shape = ()
+        return self._rng.integers(low=low, high=high, size=shape, dtype=dtype)
 
     # Linear algebra operations
     def inv(self, a) -> Any:
