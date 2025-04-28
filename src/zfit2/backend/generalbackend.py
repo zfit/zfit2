@@ -2,13 +2,13 @@
 
 This module provides a unified interface to different computational backends.
 """
+
 from __future__ import annotations
 
-import importlib.util
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from collections.abc import Callable, Sequence
+from typing import Any, Union
 
 from .base import BackendBase
-from .errors import BackendError, NotImplementedInBackend
 
 
 class Backend(BackendBase):
@@ -26,6 +26,7 @@ class Backend(BackendBase):
                 If None, JAX will be used if available, otherwise NumPy.
         """
         from . import get_backend
+
         self._backend = get_backend(backend_name)
 
     @property
@@ -147,11 +148,15 @@ class Backend(BackendBase):
 
     def var(self, a, axis=None, dtype=None, ddof=0, keepdims=False) -> Any:
         """Compute the variance along the specified axis."""
-        return self._backend.var(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
+        return self._backend.var(
+            a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims
+        )
 
     def std(self, a, axis=None, dtype=None, ddof=0, keepdims=False) -> Any:
         """Compute the standard deviation along the specified axis."""
-        return self._backend.std(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
+        return self._backend.std(
+            a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims
+        )
 
     def min(self, a, axis=None, keepdims=False) -> Any:
         """Return minimum of an array or minimum along an axis."""
@@ -192,18 +197,22 @@ class Backend(BackendBase):
     # Statistical functions
     def normal(self, loc=0.0, scale=1.0, size=None, dtype=None, key=None) -> Any:
         """Draw random samples from a normal distribution."""
-        return self._backend.normal(loc=loc, scale=scale, size=size, dtype=dtype, key=key)
+        return self._backend.normal(
+            loc=loc, scale=scale, size=size, dtype=dtype, key=key
+        )
 
     def uniform(self, low=0.0, high=1.0, size=None, dtype=None, key=None) -> Any:
         """Draw random samples from a uniform distribution."""
-        return self._backend.uniform(low=low, high=high, size=size, dtype=dtype, key=key)
+        return self._backend.uniform(
+            low=low, high=high, size=size, dtype=dtype, key=key
+        )
 
     # Linear algebra operations
     def inv(self, a) -> Any:
         """Compute the inverse of a matrix."""
         return self._backend.inv(a)
 
-    def eigh(self, a) -> Tuple[Any, Any]:
+    def eigh(self, a) -> tuple[Any, Any]:
         """Return eigenvalues and eigenvectors of a Hermitian or symmetric matrix."""
         return self._backend.eigh(a)
 
@@ -220,11 +229,15 @@ class Backend(BackendBase):
         """Return a function to compute the gradient of `fun` with respect to positional arguments."""
         return self._backend.grad(fun, argnums=argnums)
 
-    def hessian(self, fun: Callable, argnums: Union[int, Sequence[int]] = 0) -> Callable:
+    def hessian(
+        self, fun: Callable, argnums: Union[int, Sequence[int]] = 0
+    ) -> Callable:
         """Return a function to compute the Hessian of `fun` with respect to positional arguments."""
         return self._backend.hessian(fun, argnums=argnums)
 
-    def jacobian(self, fun: Callable, argnums: Union[int, Sequence[int]] = 0) -> Callable:
+    def jacobian(
+        self, fun: Callable, argnums: Union[int, Sequence[int]] = 0
+    ) -> Callable:
         """Return a function to compute the Jacobian of `fun` with respect to positional arguments."""
         return self._backend.jacobian(fun, argnums=argnums)
 

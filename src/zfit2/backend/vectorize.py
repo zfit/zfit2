@@ -1,127 +1,140 @@
-"""Vectorization utilities for backend operations."""
+"""Vectorization utilities for the backend module."""
+
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+import functools
+from collections.abc import Callable, Sequence
+from typing import TypeVar, Union
 
-from . import get_backend
+# Type variables
+T = TypeVar("T")
+R = TypeVar("R")
 
 
-def vmap(
-    fun: Callable, 
-    in_axes: Union[int, Sequence[int], None] = 0, 
-    out_axes: Union[int, None] = 0
-) -> Callable:
-    """Vectorizes a function along the specified axes.
-    
-    This function is an abstraction over different backend implementations:
-    - For JAX, it uses jax.vmap directly
-    - For NumPy, it uses numpy.vectorize or a custom implementation
-    - For SymPy, it raises NotImplementedInBackend
-    
+def vmap(fun: Callable, in_axes=0, out_axes=0) -> Callable:
+    """Vectorize a function along specified axes.
+
+    This is a convenience wrapper around the backend's vmap function that
+    ensures the function is vectorized using the current active backend.
+
     Args:
-        fun: Function to be vectorized.
-        in_axes: Specifies which axes of inputs to map over, either:
-            - Integer: Specifies the same axis for all inputs
-            - Sequence: Specifies an axis for each input
-            - None: Specifies that the input is broadcasted
-        out_axes: Specifies which axis the output should have.
-            
+        fun: The function to vectorize.
+        in_axes: Specification of which axes to map over for each input.
+        out_axes: Specification of which axes in the output correspond to mapped axes.
+
     Returns:
-        A vectorized version of the input function.
-    
+        A vectorized version of the function.
+
     Example:
-        >>> import zfit2.backend as zb
-        >>> def f(x):
-        ...     return x ** 2
-        >>> vf = zb.vmap(f)
-        >>> x = zb.array([1, 2, 3])
-        >>> vf(x)  # array([1, 4, 9])
+        >>> import zfit2.backend as z
+        >>> from zfit2.backend import numpy as znp
+        >>> from zfit2.backend import vectorize
+        >>>
+        >>> def f(x, y):
+        ...     return x + y
+        >>>
+        >>> # Vectorize over the first axis of both inputs
+        >>> vf = vectorize.vmap(f)
+        >>>
+        >>> # Apply to arrays
+        >>> x = znp.array([[1, 2], [3, 4]])
+        >>> y = znp.array([[10, 20], [30, 40]])
+        >>> vf(x, y)  # Applies f to each row: [f([1, 2], [10, 20]), f([3, 4], [30, 40])]
     """
-    backend = get_backend()
-    
-    if backend.name == "JAX":
-        # Use JAX's vmap directly
-        return backend._vmap(fun, in_axes=in_axes, out_axes=out_axes)
-    
-    elif backend.name == "NumPy":
-        # Use a custom implementation for NumPy
-        import numpy as np
-        
-        # Handle in_axes
-        if in_axes is None:
-            # Broadcast the input
-            def vectorized_fun(*args, **kwargs):
-                return fun(*args, **kwargs)
-        elif isinstance(in_axes, int):
-            # Same axis for all inputs
-            def vectorized_fun(*args, **kwargs):
-                # Get the shape of the input along the specified axis
-                if not args:
-                    return fun(*args, **kwargs)
-                
-                shape = np.array(args[0]).shape[in_axes]
-                result = np.zeros(shape)
-                
-                # Apply function to each element
-                for i in range(shape):
-                    new_args = []
-                    for arg in args:
-                        arg_array = np.array(arg)
-                        # Handle scalar arguments
-                        if arg_array.ndim <= in_axes:
-                            new_args.append(arg)
-                        else:
-                            # Select the current slice
-                            idx = [slice(None)] * arg_array.ndim
-                            idx[in_axes] = i
-                            new_args.append(arg_array[tuple(idx)])
-                    
-                    result[i] = fun(*new_args, **kwargs)
-                
-                return result
-        else:
-            # Different axis for each input
-            def vectorized_fun(*args, **kwargs):
-                if not args or len(args) != len(in_axes):
-                    return fun(*args, **kwargs)
-                
-                # Get the shape of the output
-                shapes = []
-                for arg, axis in zip(args, in_axes):
-                    if axis is not None:
-                        arg_array = np.array(arg)
-                        if arg_array.ndim > axis:
-                            shapes.append(arg_array.shape[axis])
-                
-                if not shapes:
-                    return fun(*args, **kwargs)
-                
-                shape = shapes[0]
-                result = np.zeros(shape)
-                
-                # Apply function to each element
-                for i in range(shape):
-                    new_args = []
-                    for arg, axis in zip(args, in_axes):
-                        arg_array = np.array(arg)
-                        if axis is None or arg_array.ndim <= axis:
-                            new_args.append(arg)
-                        else:
-                            # Select the current slice
-                            idx = [slice(None)] * arg_array.ndim
-                            idx[axis] = i
-                            new_args.append(arg_array[tuple(idx)])
-                    
-                    result[i] = fun(*new_args, **kwargs)
-                
-                return result
-        
-        return vectorized_fun
-    
-    elif backend.name == "SymPy":
-        # SymPy doesn't support vectorization
-        from .errors import NotImplementedInBackend
-        raise NotImplementedInBackend("vmap", "SymPy")
-    
-    else:
-        raise ValueError(f"Unknown backend: {backend.name}")
+    from . import get_backend
+
+    @functools.wraps(fun)
+    def vmapped_fun(*args, **kwargs):
+        # Get the current backend
+        backend = get_backend()
+
+        # Create the vectorized function using the current backend
+        vectorized = backend.vmap(fun, in_axes=in_axes, out_axes=out_axes)
+
+        # Apply it to the arguments
+        return vectorized(*args, **kwargs)
+
+    return vmapped_fun
+
+
+def auto_batch(
+    batch_dims: Union[int, Sequence[int]] = 0,
+) -> Callable[[Callable], Callable]:
+    """Decorator to automatically batch a function along specified dimensions.
+
+    This decorator automatically applies vmap to a function, making it batch
+    over the specified dimensions. It's a convenience wrapper for common vectorization
+    patterns.
+
+    Args:
+        batch_dims: The dimensions to batch over. Can be an int (same dimension for all inputs)
+                    or a sequence of integers (one per input).
+
+    Returns:
+        A decorator that applies vmap to the decorated function.
+
+    Example:
+        >>> import zfit2.backend as z
+        >>> from zfit2.backend import numpy as znp
+        >>> from zfit2.backend.vectorize import auto_batch
+        >>>
+        >>> # Automatically batch over the first dimension
+        >>> @auto_batch(0)
+        ... def add(x, y):
+        ...     return x + y
+        >>>
+        >>> # Equivalent to:
+        >>> # add = vmap(lambda x, y: x + y, in_axes=0, out_axes=0)
+        >>>
+        >>> # Apply to arrays
+        >>> x = znp.array([[1, 2], [3, 4]])
+        >>> y = znp.array([[10, 20], [30, 40]])
+        >>> add(x, y)  # Returns array([[11, 22], [33, 44]])
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Handle kwargs by moving them to args
+            # (vmap only works on positional arguments)
+            if kwargs:
+                # Get function signature
+                import inspect
+
+                sig = inspect.signature(func)
+
+                # Create new args list with kwargs filled in
+                new_args = list(args)
+                for param_name, param in sig.parameters.items():
+                    if param_name in kwargs:
+                        # Find the position of the parameter
+                        param_idx = list(sig.parameters.keys()).index(param_name)
+
+                        # Extend args if necessary
+                        if len(new_args) <= param_idx:
+                            new_args.extend([None] * (param_idx - len(new_args) + 1))
+
+                        # Set the argument
+                        new_args[param_idx] = kwargs[param_name]
+
+                # Convert back to tuple
+                args = tuple(new_args)
+
+            # Determine in_axes
+            if isinstance(batch_dims, int):
+                in_axes = batch_dims
+            # Make sure batch_dims matches the number of args
+            elif len(batch_dims) < len(args):
+                # Extend with the last value
+                in_axes = list(batch_dims) + [batch_dims[-1]] * (
+                    len(args) - len(batch_dims)
+                )
+            else:
+                in_axes = batch_dims[: len(args)]
+
+            # Apply vmap
+            return vmap(func, in_axes=in_axes, out_axes=0)(*args)
+
+        return wrapper
+
+    return decorator
