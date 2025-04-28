@@ -123,7 +123,6 @@ def auto_batch(
             # Determine in_axes
             if isinstance(batch_dims, int):
                 in_axes = batch_dims
-            # Make sure batch_dims matches the number of args
             elif len(batch_dims) < len(args):
                 # Extend with the last value
                 in_axes = list(batch_dims) + [batch_dims[-1]] * (

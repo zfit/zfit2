@@ -46,6 +46,23 @@ class BackendBase(ABC):
     def full(self, shape, fill_value, dtype=None, device=None) -> Any:
         """Return a new array of given shape and type, filled with fill_value."""
 
+    # Array information functions
+    def shape(self, a) -> Any:
+        """Return the shape of an array."""
+        return a.shape if hasattr(a, "shape") else ()
+
+    def size(self, a) -> Any:
+        """Return the number of elements in an array."""
+        return a.size if hasattr(a, "size") else 1
+
+    def ndim(self, a) -> Any:
+        """Return the number of dimensions of an array."""
+        return a.ndim if hasattr(a, "ndim") else 0
+
+    def dtype(self, a) -> Any:
+        """Return the data type of an array."""
+        return a.dtype if hasattr(a, "dtype") else type(a)
+
     # Math operations
     @abstractmethod
     def sum(self, a, axis=None, dtype=None, keepdims=False) -> Any:
@@ -173,16 +190,20 @@ class BackendBase(ABC):
 
     # Statistical functions
     @abstractmethod
-    def normal(self, key=None, shape=None, dtype=None, loc=0.0, scale=1.0) -> Any:
-        """Draw random samples from a normal distribution."""
+    def normal(self, loc=0.0, scale=1.0, shape=None, dtype=None, key=None) -> Any:
+        """Draw random samples from a normal (Gaussian) distribution."""
 
     @abstractmethod
-    def uniform(self, key=None, shape=None, dtype=None, minval=0.0, maxval=1.0) -> Any:
+    def uniform(self, minval=0.0, maxval=1.0, shape=None, dtype=None, key=None) -> Any:
         """Draw random samples from a uniform distribution."""
 
-    @abstractmethod
+    def random_seed(self, seed=None) -> None:
+        """Seed the random number generator."""
+        self._not_implemented("random_seed")
+
     def random_split(self, key, num=2) -> Any:
         """Split a PRNG key into multiple keys."""
+        self._not_implemented("random_split")
 
     # Linear algebra operations
     @abstractmethod

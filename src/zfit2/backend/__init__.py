@@ -126,14 +126,6 @@ class BackendInterface:
         return getattr(get_backend(), name)
 
 
-class NumPyInterface:
-    """NumPy-like interface to the active backend's mathematical operations."""
-
-    def __getattr__(self, name: str) -> Any:
-        """Get math functions from the active backend."""
-        return getattr(get_backend(), name)
-
-
 # Initialize backend from environment variable if set
 if "ZFIT_BACKEND" in os.environ:
     try:
@@ -146,20 +138,16 @@ if "ZFIT_BACKEND" in os.environ:
         )
 
 
-# Expose the interfaces
+# Expose the interface
 backend = BackendInterface()
-numpy = NumPyInterface()
 
-# Expose common functions - these are now accessed through the interfaces
-# but listed here for backwards compatibility and easier imports
-# Allow from zfit2.backend import numpy as znp
+# Expose common functions for direct imports
 from .optimize import curve_fit, minimize, root
 from .vectorize import vmap
 
 __all__ = [
-    # Main interfaces
+    # Main interface
     "backend",
-    "numpy",
     # Backend management
     "get_backend",
     "set_backend",
