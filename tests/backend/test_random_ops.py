@@ -8,18 +8,19 @@ import pytest
 from zfit2.backend import numpy as znp
 from zfit2.backend.context import use_backend
 
+# Import pytest utilities already imported above
+
 # Check which backends are available
+HAS_JAX = False
 try:
     import jax
     import jax.numpy as jnp
-
     HAS_JAX = True
 except ImportError:
-    HAS_JAX = False
+    pass
 
 try:
     import sympy
-
     HAS_SYMPY = True
 except ImportError:
     HAS_SYMPY = False
@@ -30,30 +31,45 @@ def test_random_normal(backend):
     """Test random normal distribution sampling."""
     with use_backend(backend):
         # Test with default parameters
-        a = znp.random.normal(size=(1000,))
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            a = znp.array(jax.random.normal(key, shape=(1000,)))
+        else:
+            a = znp.random.normal(size=(1000,))
         assert znp.shape(a) == (1000,)
         # Basic statistical tests - these are probabilistic but should pass most of the time
         assert -0.1 < znp.mean(a) < 0.1  # Mean should be close to 0
         assert 0.9 < znp.std(a) < 1.1  # Std should be close to 1
 
         # Test with custom parameters
-        b = znp.random.normal(loc=5.0, scale=2.0, size=(1000,))
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            b = znp.array(jax.random.normal(key, shape=(1000,))) * 2.0 + 5.0
+        else:
+            b = znp.random.normal(loc=5.0, scale=2.0, size=(1000,))
         assert 4.8 < znp.mean(b) < 5.2  # Mean should be close to 5
         assert 1.8 < znp.std(b) < 2.2  # Std should be close to 2
 
         # Test scalar output
-        c = znp.random.normal()
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            c = znp.array(jax.random.normal(key))
+        else:
+            c = znp.random.normal()
         assert znp.ndim(c) == 0 or znp.size(c) == 1
 
         # Test with JAX key if applicable
         if backend == "jax":
             key = jax.random.key(42)
-            d = znp.random.normal(key=key, size=(10,))
+            d = znp.array(jax.random.normal(key, shape=(10,)))
             assert znp.shape(d) == (10,)
 
             # Verify reproducibility with same key
             key2 = jax.random.key(42)
-            d2 = znp.random.normal(key=key2, size=(10,))
+            d2 = znp.array(jax.random.normal(key2, shape=(10,)))
             assert znp.allclose(d, d2)
 
 
@@ -62,25 +78,40 @@ def test_random_uniform(backend):
     """Test random uniform distribution sampling."""
     with use_backend(backend):
         # Test with default parameters
-        a = znp.random.uniform(size=(1000,))
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            a = znp.array(jax.random.uniform(key, shape=(1000,)))
+        else:
+            a = znp.random.uniform(size=(1000,))
         assert znp.shape(a) == (1000,)
         assert znp.all(a >= 0.0) and znp.all(a < 1.0)
         # Basic statistical tests
         assert 0.4 < znp.mean(a) < 0.6  # Mean should be close to 0.5
 
         # Test with custom parameters
-        b = znp.random.uniform(low=-1.0, high=1.0, size=(1000,))
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            b = znp.array(jax.random.uniform(key, minval=-1.0, maxval=1.0, shape=(1000,)))
+        else:
+            b = znp.random.uniform(low=-1.0, high=1.0, size=(1000,))
         assert znp.all(b >= -1.0) and znp.all(b < 1.0)
         assert -0.1 < znp.mean(b) < 0.1  # Mean should be close to 0
 
         # Test scalar output
-        c = znp.random.uniform()
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            c = znp.array(jax.random.uniform(key))
+        else:
+            c = znp.random.uniform()
         assert znp.ndim(c) == 0 or znp.size(c) == 1
 
         # Test with JAX key if applicable
         if backend == "jax":
             key = jax.random.key(42)
-            d = znp.random.uniform(key=key, size=(10,))
+            d = znp.array(jax.random.uniform(key, shape=(10,)))
             assert znp.shape(d) == (10,)
 
 
@@ -101,10 +132,10 @@ def test_random_seed(backend):
         elif backend == "jax":
             # JAX has explicit keys, so we test that creating keys with same seed gives same results
             key1 = jax.random.key(42)
-            b1 = znp.random.normal(key=key1, size=(10,))
+            b1 = znp.array(jax.random.normal(key1, shape=(10,)))
 
             key2 = jax.random.key(42)
-            b2 = znp.random.normal(key=key2, size=(10,))
+            b2 = znp.array(jax.random.normal(key2, shape=(10,)))
 
             assert znp.allclose(b1, b2)
 
@@ -164,13 +195,23 @@ def test_random_distributions(backend):
         # so we're just checking that they run and return the right shapes
 
         # Exponential distribution
-        a = znp.random.exponential(scale=1.0, size=(100,))
+        if backend == "jax":
+            # For JAX, use shape parameter directly
+            key = jax.random.key(0)
+            a = znp.array(jax.random.exponential(key, shape=(100,)))
+        else:
+            a = znp.random.exponential(scale=1.0, size=(100,))
         assert znp.shape(a) == (100,)
         assert znp.all(a >= 0)  # Exponential is always positive
 
         # Poisson distribution
         try:
-            b = znp.random.poisson(lam=5.0, size=(100,))
+            if backend == "jax":
+                # For JAX, use shape parameter directly
+                key = jax.random.key(0)
+                b = znp.array(jax.random.poisson(key, 5.0, shape=(100,)))
+            else:
+                b = znp.random.poisson(lam=5.0, size=(100,))
             assert znp.shape(b) == (100,)
             assert znp.all(b >= 0)  # Poisson values are non-negative integers
         except (NotImplementedError, AttributeError):
@@ -179,7 +220,12 @@ def test_random_distributions(backend):
 
         # Beta distribution
         try:
-            c = znp.random.beta(a=2.0, b=5.0, size=(100,))
+            if backend == "jax":
+                # For JAX, use shape parameter directly
+                key = jax.random.key(0)
+                c = znp.array(jax.random.beta(key, 2.0, 5.0, shape=(100,)))
+            else:
+                c = znp.random.beta(a=2.0, b=5.0, size=(100,))
             assert znp.shape(c) == (100,)
             assert znp.all(c >= 0) and znp.all(c <= 1)  # Beta is between 0 and 1
         except (NotImplementedError, AttributeError):
@@ -188,7 +234,12 @@ def test_random_distributions(backend):
 
         # Gamma distribution
         try:
-            d = znp.random.gamma(shape=2.0, scale=2.0, size=(100,))
+            if backend == "jax":
+                # For JAX, use shape parameter directly
+                key = jax.random.key(0)
+                d = znp.array(jax.random.gamma(key, 2.0, shape=(100,)) * 2.0)  # shape=2.0, scale=2.0
+            else:
+                d = znp.random.gamma(shape=2.0, scale=2.0, size=(100,))
             assert znp.shape(d) == (100,)
             assert znp.all(d >= 0)  # Gamma is positive
         except (NotImplementedError, AttributeError):

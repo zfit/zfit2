@@ -7,38 +7,39 @@ numerical stability improvements for handling floating-point issues.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from collections.abc import Mapping, Sequence
+from typing import Any, Optional, Union
 
-import numpy as np
 import jax
 import jax.lax
-import jax.numpy as jnp
+import numpy as np
 
 from .backend import numpy as znp
 from .diff import create_differentiator
 from .dist import Distribution
-from .parameter import Parameter, Parameters
 from .statistic import Statistics
 from .valueholder import ValueHolder
 
 
 class SumMethod:
     """Enumeration of available summation methods for log-likelihoods."""
-    DIRECT = "direct"        # Simple sum
-    STABLE = "stable"        # Sorted sum (more stable)
-    PAIRWISE = "pairwise"    # Divide-and-conquer summation
-    KAHAN = "kahan"          # Kahan compensated summation
-    NEUMAIER = "neumaier"    # Neumaier improved compensated summation
+
+    DIRECT = "direct"  # Simple sum
+    STABLE = "stable"  # Sorted sum (more stable)
+    PAIRWISE = "pairwise"  # Divide-and-conquer summation
+    KAHAN = "kahan"  # Kahan compensated summation
+    NEUMAIER = "neumaier"  # Neumaier improved compensated summation
     LOGSUMEXP = "logsumexp"  # Log-sum-exp for numerical stability
 
 
 class ZeroHandler:
     """Methods for handling zero values in log-likelihood calculations."""
-    IGNORE = "ignore"        # Ignore zeros in the computation (skip them)
-    EPSILON = "epsilon"      # Add a small epsilon to zeros
-    CLAMP = "clamp"          # Clamp values to a minimum threshold
-    SMOOTHED = "smoothed"    # Use a smoothed transition function
-    SHIFTED = "shifted"      # Shift all values by the absolute minimum
+
+    IGNORE = "ignore"  # Ignore zeros in the computation (skip them)
+    EPSILON = "epsilon"  # Add a small epsilon to zeros
+    CLAMP = "clamp"  # Clamp values to a minimum threshold
+    SMOOTHED = "smoothed"  # Use a smoothed transition function
+    SHIFTED = "shifted"  # Shift all values by the absolute minimum
 
 
 class NLL(Statistics):
@@ -50,16 +51,16 @@ class NLL(Statistics):
     """
 
     def __init__(
-            self,
-            distribution: Distribution,
-            data: Mapping[str, Union[float, np.ndarray]],
-            *,
-            name: Optional[str] = None,
-            use_jax: bool = True,
-            constant_subtraction: Union[str, float, None] = None,
-            zero_handling: str = ZeroHandler.EPSILON,
-            epsilon: float = 1e-10,
-            min_value: float = -1e10,
+        self,
+        distribution: Distribution,
+        data: Mapping[str, Union[float, np.ndarray]],
+        *,
+        name: Optional[str] = None,
+        use_jax: bool = True,
+        constant_subtraction: Union[str, float, None] = None,
+        zero_handling: str = ZeroHandler.EPSILON,
+        epsilon: float = 1e-10,
+        min_value: float = -1e10,
     ):
         """Initialize the Negative Log-Likelihood.
 
@@ -94,7 +95,7 @@ class NLL(Statistics):
 
         # Set up zero handling
         if zero_handling not in vars(ZeroHandler).values():
-            valid_methods = [m for m in dir(ZeroHandler) if not m.startswith('_')]
+            valid_methods = [m for m in dir(ZeroHandler) if not m.startswith("_")]
             msg = f"Invalid zero handling method: {zero_handling}. Valid methods: {valid_methods}"
             raise ValueError(msg)
         self.zero_handling = zero_handling
@@ -120,7 +121,7 @@ class NLL(Statistics):
                 self.constant = znp.sum(pointwise)
 
     def pointwise_loglik(
-            self, params: Optional[Mapping[str, Union[float, np.ndarray]]] = None
+        self, params: Optional[Mapping[str, Union[float, np.ndarray]]] = None
     ) -> np.ndarray:
         """Calculate the pointwise log-likelihood for each data point.
 
@@ -132,7 +133,9 @@ class NLL(Statistics):
             An array of log-likelihoods, one for each data point.
         """
         # Extract data values for the domain variables
-        data_values = {var.name: self.data[var.name] for var in self.distribution.domain.variables}
+        data_values = {
+            var.name: self.data[var.name] for var in self.distribution.domain.variables
+        }
 
         # Call the log_pdf method of the distribution
         loglik_values = self.distribution.log_pdf(data_values, params=params)
@@ -151,61 +154,57 @@ class NLL(Statistics):
         Returns:
             Modified array with handled zero/negative values.
         """
-        if self.zero_handling == ZeroHandler.IGNORE:
-            # Values will be ignored during summation, no change needed here
-            return values
+        # Use JAX-compatible approach with jnp.where instead of if/else
 
-        elif self.zero_handling == ZeroHandler.EPSILON:
-            # Add a small epsilon to avoid log(0)
-            # For very negative values, exp(value) will be close to zero
-            # log(exp(value) + epsilon) ≈ log(epsilon) for very negative values
-            return znp.log(znp.exp(values) + self.epsilon)
+        # EPSILON handling: log(exp(values) + epsilon)
+        epsilon_result = znp.log(znp.exp(values) + self.epsilon)
 
-        elif self.zero_handling == ZeroHandler.CLAMP:
-            # Clamp values to a minimum threshold
-            return znp.maximum(values, self.min_value)
+        # CLAMP handling: max(values, min_value)
+        clamp_result = znp.maximum(values, self.min_value)
 
-        elif self.zero_handling == ZeroHandler.SMOOTHED:
-            # Use a smoothed transition function
-            # For x > threshold: f(x) = x
-            # For x <= threshold: f(x) smoothly approaches min_value
-            threshold = self.min_value / 2
-            above_threshold = values > threshold
+        # SMOOTHED handling
+        threshold = self.min_value / 2
+        alpha = 1.0  # Controls smoothness of transition
+        # Calculate smoothed values for all elements
+        smoothed = self.min_value + (threshold - self.min_value) * znp.exp(
+            alpha * (values - threshold) / (threshold - self.min_value)
+        )
+        # Use where for the transition
+        smoothed_result = znp.where(values > threshold, values, smoothed)
 
-            # For values below threshold, use smooth transition
-            below = ~above_threshold
-            if znp.any(below):
-                # Create a mask for the below values
-                mask = znp.zeros_like(values, dtype=bool)
-                mask = mask.at[znp.where(below)[0]].set(True)
+        # SHIFTED handling
+        min_val = znp.min(values)
+        shifted_result = znp.where(
+            min_val < 0,
+            values - min_val + self.epsilon,
+            values
+        )
 
-                # Calculate the smoothed values for all elements
-                # (will only be used where mask is True)
-                alpha = 1.0  # Controls smoothness of transition
-                smoothed = self.min_value + (threshold - self.min_value) * znp.exp(
-                    alpha * (values - threshold) / (threshold - self.min_value)
+        # Select the appropriate result based on zero_handling
+        result = znp.where(
+            self.zero_handling == ZeroHandler.EPSILON,
+            epsilon_result,
+            znp.where(
+                self.zero_handling == ZeroHandler.CLAMP,
+                clamp_result,
+                znp.where(
+                    self.zero_handling == ZeroHandler.SMOOTHED,
+                    smoothed_result,
+                    znp.where(
+                        self.zero_handling == ZeroHandler.SHIFTED,
+                        shifted_result,
+                        values  # Default or IGNORE case
+                    )
                 )
+            )
+        )
 
-                # Use where to create a new array without in-place modification
-                return znp.where(mask, smoothed, values)
-
-            # If no values are below threshold, return the original values
-            return values
-
-        elif self.zero_handling == ZeroHandler.SHIFTED:
-            # Shift all values by the absolute minimum
-            min_val = znp.min(values)
-            if min_val < 0:
-                return values - min_val + self.epsilon
-            return values
-
-        # Default case - return values unchanged
-        return values
+        return result
 
     def sum_loglik(
-            self,
-            params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
-            method: str = SumMethod.DIRECT
+        self,
+        params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
+        method: str = SumMethod.DIRECT,
     ) -> Union[float, np.ndarray]:
         """Calculate the sum of log-likelihoods using the specified method.
 
@@ -219,48 +218,82 @@ class NLL(Statistics):
         pointwise = self.pointwise_loglik(params)
 
         # Apply per-point constant subtraction if enabled
-        if self.constant_subtraction == "per_point":
-            # Use the pre-calculated point_constants
-            pointwise = pointwise - self.point_constants
+        # Use JAX-compatible approach with znp.where
+        is_per_point = self.constant_subtraction == "per_point"
+        pointwise = znp.where(
+            is_per_point,
+            pointwise - self.point_constants,
+            pointwise
+        )
 
         # Special handling for ZeroHandler.IGNORE case
-        if self.zero_handling == ZeroHandler.IGNORE:
-            # Filter out -inf or very negative values before summation
-            valid_mask = znp.isfinite(pointwise) & (pointwise > self.min_value)
-            if not znp.any(valid_mask):
-                return self.min_value  # All values are invalid
-            pointwise = pointwise[valid_mask]
+        # Instead of filtering, we'll use a mask with znp.where
+        is_ignore = self.zero_handling == ZeroHandler.IGNORE
+        valid_mask = znp.isfinite(pointwise) & (pointwise > self.min_value)
 
-        # Choose summation method
-        if method == SumMethod.DIRECT:
-            result = znp.sum(pointwise)
-        elif method == SumMethod.STABLE:
-            result = self._stable_sum(pointwise)
-        elif method == SumMethod.PAIRWISE:
-            result = self._pairwise_sum(pointwise)
-        elif method == SumMethod.KAHAN:
-            result = self._kahan_sum(pointwise)
-        elif method == SumMethod.NEUMAIER:
-            result = self._neumaier_sum(pointwise)
-        elif method == SumMethod.LOGSUMEXP:
-            result = self._logsumexp_sum(pointwise)
-        else:
-            msg = f"Unknown summation method: {method}"
-            raise ValueError(msg)
+        # Prepare different summation results
+        # Direct sum
+        direct_sum = znp.sum(pointwise)
+
+        # Direct sum with mask for IGNORE case
+        masked_sum = znp.sum(znp.where(valid_mask, pointwise, 0.0))
+
+        # Other summation methods
+        stable_sum = self._stable_sum(pointwise)
+        pairwise_sum = self._pairwise_sum(pointwise)
+        kahan_sum = self._kahan_sum(pointwise)
+        neumaier_sum = self._neumaier_sum(pointwise)
+        logsumexp_sum = self._logsumexp_sum(pointwise)
+
+        # Select the appropriate summation result based on method
+        # Use nested znp.where for method selection
+        result = znp.where(
+            method == SumMethod.DIRECT,
+            znp.where(is_ignore, masked_sum, direct_sum),
+            znp.where(
+                method == SumMethod.STABLE,
+                stable_sum,
+                znp.where(
+                    method == SumMethod.PAIRWISE,
+                    pairwise_sum,
+                    znp.where(
+                        method == SumMethod.KAHAN,
+                        kahan_sum,
+                        znp.where(
+                            method == SumMethod.NEUMAIER,
+                            neumaier_sum,
+                            znp.where(
+                                method == SumMethod.LOGSUMEXP,
+                                logsumexp_sum,
+                                direct_sum  # Default case
+                            )
+                        )
+                    )
+                )
+            )
+        )
 
         # Apply global constant subtraction if enabled
-        if isinstance(self.constant_subtraction, (int, float)):
-            result = result - self.constant_subtraction
-        elif self.constant_subtraction == "auto":
-            # Use the pre-calculated constant
-            result = result - self.constant
+        # Use JAX-compatible approach with znp.where
+        is_numeric_constant = isinstance(self.constant_subtraction, (int, float))
+        is_auto_constant = self.constant_subtraction == "auto"
+
+        result = znp.where(
+            is_numeric_constant,
+            result - self.constant_subtraction,
+            znp.where(
+                is_auto_constant,
+                result - self.constant,
+                result
+            )
+        )
 
         return result
 
     def nll(
-            self,
-            params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
-            method: str = SumMethod.DIRECT
+        self,
+        params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
+        method: str = SumMethod.DIRECT,
     ) -> Union[float, np.ndarray]:
         """Calculate the negative log-likelihood.
 
@@ -274,7 +307,9 @@ class NLL(Statistics):
         # Return the JAX array directly without converting to float
         return -self.sum_loglik(params, method=method)
 
-    def calculate(self, params: Optional[Mapping[str, Any]] = None) -> Union[float, np.ndarray]:
+    def calculate(
+        self, params: Optional[Mapping[str, Any]] = None
+    ) -> Union[float, np.ndarray]:
         """Calculate the negative log-likelihood (Statistics interface method).
 
         Args:
@@ -286,7 +321,7 @@ class NLL(Statistics):
         return self.nll(params)
 
     def grad(
-            self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
     ) -> ValueHolder:
         """Calculate the gradient of the negative log-likelihood.
 
@@ -306,7 +341,7 @@ class NLL(Statistics):
         return self.differentiator.grad(nll_func, params_dict)
 
     def hess(
-            self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
     ) -> ValueHolder:
         """Calculate the Hessian of the negative log-likelihood.
 
@@ -326,10 +361,10 @@ class NLL(Statistics):
         return self.differentiator.hess(nll_func, params_dict)
 
     def hvp(
-            self,
-            vector: Mapping[str, Any],
-            params: Optional[Mapping[str, Any]] = None,
-            method: str = SumMethod.DIRECT
+        self,
+        vector: Mapping[str, Any],
+        params: Optional[Mapping[str, Any]] = None,
+        method: str = SumMethod.DIRECT,
     ) -> ValueHolder:
         """Calculate Hessian-vector product (more efficient than full Hessian).
 
@@ -350,8 +385,8 @@ class NLL(Statistics):
         return self.differentiator.hvp(nll_func, params_dict, vector)
 
     def val_and_grad(
-            self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
-    ) -> Tuple[Union[float, np.ndarray], ValueHolder]:
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+    ) -> tuple[Union[float, np.ndarray], ValueHolder]:
         """Calculate both the NLL value and its gradient.
 
         Args:
@@ -371,7 +406,9 @@ class NLL(Statistics):
         # Return the JAX array directly without converting to float
         return value, gradient
 
-    def _prepare_params(self, params: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    def _prepare_params(
+        self, params: Optional[Mapping[str, Any]] = None
+    ) -> dict[str, Any]:
         """Prepare parameters for calculation.
 
         Args:
@@ -382,13 +419,15 @@ class NLL(Statistics):
         """
         if params is None:
             # Use the current values of the distribution parameters
-            return {param.name: param.value for param in self.distribution.params.params}
+            return {
+                param.name: param.value for param in self.distribution.params.params
+            }
         elif isinstance(params, ValueHolder):
             return params._values
         else:
             return dict(params)
 
-    def __add__(self, other: Union[NLL, 'NLLS']) -> 'NLLS':
+    def __add__(self, other: Union[NLL, NLLS]) -> NLLS:
         """Add this NLL to another NLL or NLLS.
 
         Args:
@@ -416,6 +455,7 @@ class NLL(Statistics):
 
         Pairwise summation is a divide-and-conquer approach with O(log n) error growth.
         """
+
         # Implement pairwise summation without modifying the input array
         def pairwise_sum_recursive(arr):
             n = len(arr)
@@ -436,6 +476,7 @@ class NLL(Statistics):
 
     def _kahan_sum(self, values: np.ndarray) -> Union[float, np.ndarray]:
         """Calculate sum using Kahan summation algorithm for error compensation."""
+
         # JAX-friendly implementation using scan
         def kahan_step(carry, val):
             sum_val, compensation = carry
@@ -461,6 +502,7 @@ class NLL(Statistics):
         This algorithm is more robust when adding values with large magnitude differences.
         Implemented using JAX's scan for functional programming compatibility.
         """
+
         # Define a step function for Neumaier summation
         def neumaier_step(carry, val):
             sum_val, compensation = carry
@@ -474,7 +516,7 @@ class NLL(Statistics):
             new_compensation = znp.where(
                 znp.abs(sum_val) >= znp.abs(val),
                 compensation + ((sum_val - temp_sum) + val),
-                compensation + ((val - temp_sum) + sum_val)
+                compensation + ((val - temp_sum) + sum_val),
             )
 
             return (temp_sum, new_compensation), None
@@ -502,27 +544,28 @@ class NLL(Statistics):
         Returns:
             Calculated log-sum-exp value.
         """
-        if len(values) == 0:
-            return -znp.inf
+        # Handle empty array case with a default value that won't cause tracer errors
+        empty_result = -1e38  # A very negative number instead of -inf
 
-        max_val = znp.max(values)
-        if znp.isinf(max_val) and max_val < 0:
-            return -znp.inf  # All values are -inf
-
-        # Shift values by max to avoid overflow
-        shifted = values - max_val
-
-        # Calculate sum(exp(shifted)) and take log
-        # Using built-in logsumexp when available for better precision
-        if self.differentiator.use_jax:
+        # Use JAX's built-in logsumexp when available
+        try:
             from jax.nn import logsumexp
             return logsumexp(values)
-        else:
+        except ImportError:
             try:
                 from scipy.special import logsumexp
                 return logsumexp(values)
             except ImportError:
-                # Manual implementation if scipy not available
+                # Manual implementation if neither JAX nor scipy is available
+                # This is JAX-compatible and avoids conditional statements
+
+                # Handle empty array and -inf cases with safe operations
+                max_val = znp.max(values)
+
+                # Shift values by max to avoid overflow
+                shifted = values - max_val
+
+                # Calculate sum(exp(shifted)) and take log
                 return max_val + znp.log(znp.sum(znp.exp(shifted)))
 
 
@@ -543,7 +586,9 @@ class NLLS(Statistics):
         super().__init__(name=name or "NLLS")
         self.likelihoods = list(likelihoods)
 
-    def nll(self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT) -> float:
+    def nll(
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+    ) -> float:
         """Calculate the sum of negative log-likelihoods.
 
         Args:
@@ -567,8 +612,8 @@ class NLLS(Statistics):
         return self.nll(params)
 
     def pointwise_loglik(
-            self, params: Optional[Mapping[str, Union[float, np.ndarray]]] = None
-    ) -> List[np.ndarray]:
+        self, params: Optional[Mapping[str, Union[float, np.ndarray]]] = None
+    ) -> list[np.ndarray]:
         """Calculate the pointwise log-likelihood for each NLL object.
 
         Args:
@@ -580,8 +625,9 @@ class NLLS(Statistics):
         return [nll.pointwise_loglik(params) for nll in self.likelihoods]
 
     def sum_loglik(
-            self, params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
-            method: str = SumMethod.DIRECT
+        self,
+        params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
+        method: str = SumMethod.DIRECT,
     ) -> float:
         """Calculate the sum of log-likelihoods across all NLL objects.
 
@@ -595,7 +641,7 @@ class NLLS(Statistics):
         return sum(nll.sum_loglik(params, method=method) for nll in self.likelihoods)
 
     def grad(
-            self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
     ) -> ValueHolder:
         """Calculate the gradient of the sum of negative log-likelihoods.
 
@@ -624,7 +670,7 @@ class NLLS(Statistics):
         return ValueHolder(combined_gradient)
 
     def hess(
-            self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
     ) -> ValueHolder:
         """Calculate the Hessian of the sum of negative log-likelihoods.
 
@@ -659,10 +705,10 @@ class NLLS(Statistics):
         return ValueHolder(combined_hessian)
 
     def hvp(
-            self,
-            vector: Mapping[str, Any],
-            params: Optional[Mapping[str, Any]] = None,
-            method: str = SumMethod.DIRECT
+        self,
+        vector: Mapping[str, Any],
+        params: Optional[Mapping[str, Any]] = None,
+        method: str = SumMethod.DIRECT,
     ) -> ValueHolder:
         """Calculate Hessian-vector product for the combined NLLs.
 
@@ -685,15 +731,13 @@ class NLLS(Statistics):
         # Sum up the HVPs
         combined_hvp = {}
         for name in param_names:
-            combined_hvp[name] = sum(
-                hvp._values.get(name, 0) for hvp in hvps
-            )
+            combined_hvp[name] = sum(hvp._values.get(name, 0) for hvp in hvps)
 
         return ValueHolder(combined_hvp)
 
     def val_and_grad(
-            self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
-    ) -> Tuple[Union[float, np.ndarray], ValueHolder]:
+        self, params: Optional[Mapping[str, Any]] = None, method: str = SumMethod.DIRECT
+    ) -> tuple[Union[float, np.ndarray], ValueHolder]:
         """Calculate both the NLL value and its gradient.
 
         Args:
@@ -708,7 +752,7 @@ class NLLS(Statistics):
         # Return the JAX array directly without converting to float
         return value, gradient
 
-    def __add__(self, other: Union[NLL, 'NLLS']) -> 'NLLS':
+    def __add__(self, other: Union[NLL, NLLS]) -> NLLS:
         """Add this NLLS to another NLL or NLLS.
 
         Args:
@@ -736,17 +780,17 @@ class OptimizedNLL(NLL):
     """
 
     def __init__(
-            self,
-            distribution: Distribution,
-            data: Mapping[str, Union[float, np.ndarray]],
-            *,
-            name: Optional[str] = None,
-            use_jax: bool = True,
-            constant_subtraction: str = "auto",
-            zero_handling: str = ZeroHandler.SMOOTHED,
-            epsilon: float = 1e-10,
-            min_value: float = -1e10,
-            sum_method: str = SumMethod.NEUMAIER,
+        self,
+        distribution: Distribution,
+        data: Mapping[str, Union[float, np.ndarray]],
+        *,
+        name: Optional[str] = None,
+        use_jax: bool = True,
+        constant_subtraction: str = "auto",
+        zero_handling: str = ZeroHandler.SMOOTHED,
+        epsilon: float = 1e-10,
+        min_value: float = -1e10,
+        sum_method: str = SumMethod.NEUMAIER,
     ):
         """Initialize the Optimized Negative Log-Likelihood.
 
@@ -776,9 +820,9 @@ class OptimizedNLL(NLL):
         self.sum_method = sum_method
 
     def nll(
-            self,
-            params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
-            method: Optional[str] = None
+        self,
+        params: Optional[Mapping[str, Union[float, np.ndarray]]] = None,
+        method: Optional[str] = None,
     ) -> Union[float, np.ndarray]:
         """Calculate the optimized negative log-likelihood.
 
@@ -797,7 +841,7 @@ class OptimizedNLL(NLL):
 
 
 # JAX PyTree registration for NLL class
-def _nll_flatten(nll: NLL) -> Tuple[Tuple, Dict[str, Any]]:
+def _nll_flatten(nll: NLL) -> tuple[tuple, dict[str, Any]]:
     """Flatten an NLL for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -815,7 +859,8 @@ def _nll_flatten(nll: NLL) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _nll_unflatten(aux_data: Dict[str, Any], children: Tuple) -> NLL:
+
+def _nll_unflatten(aux_data: dict[str, Any], children: tuple) -> NLL:
     """Unflatten an NLL from JAX PyTree."""
     nll = NLL(
         distribution=aux_data["distribution"],
@@ -832,15 +877,13 @@ def _nll_unflatten(aux_data: Dict[str, Any], children: Tuple) -> NLL:
     nll.point_constants = aux_data["point_constants"]
     return nll
 
+
 # Register NLL class with JAX
-jax.tree_util.register_pytree_node(
-    NLL,
-    _nll_flatten,
-    _nll_unflatten
-)
+jax.tree_util.register_pytree_node(NLL, _nll_flatten, _nll_unflatten)
+
 
 # JAX PyTree registration for OptimizedNLL class
-def _optimized_nll_flatten(nll: OptimizedNLL) -> Tuple[Tuple, Dict[str, Any]]:
+def _optimized_nll_flatten(nll: OptimizedNLL) -> tuple[tuple, dict[str, Any]]:
     """Flatten an OptimizedNLL for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -859,7 +902,8 @@ def _optimized_nll_flatten(nll: OptimizedNLL) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _optimized_nll_unflatten(aux_data: Dict[str, Any], children: Tuple) -> OptimizedNLL:
+
+def _optimized_nll_unflatten(aux_data: dict[str, Any], children: tuple) -> OptimizedNLL:
     """Unflatten an OptimizedNLL from JAX PyTree."""
     nll = OptimizedNLL(
         distribution=aux_data["distribution"],
@@ -877,9 +921,8 @@ def _optimized_nll_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Optim
     nll.point_constants = aux_data["point_constants"]
     return nll
 
+
 # Register OptimizedNLL class with JAX
 jax.tree_util.register_pytree_node(
-    OptimizedNLL,
-    _optimized_nll_flatten,
-    _optimized_nll_unflatten
+    OptimizedNLL, _optimized_nll_flatten, _optimized_nll_unflatten
 )

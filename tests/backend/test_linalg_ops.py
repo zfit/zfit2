@@ -156,18 +156,15 @@ def test_tensordot(backend):
         a = znp.arange(6).reshape(2, 3)
         b = znp.arange(12).reshape(3, 4)
 
-        # Test tensordot with default axes=2
-        c = znp.tensordot(a, b)
-        expected_c = np.array(70)  # Sum of element-wise products
-        assert znp.isclose(c, expected_c)
+        # Test tensordot with axes=1 (contract last dim of a with first dim of b)
+        c = znp.tensordot(a, b, axes=1)
+        expected_c = np.array([[20, 23, 26, 29], [56, 68, 80, 92]])
+        assert znp.allclose(c, expected_c)
 
         # Test tensordot with explicit axes
-        d = znp.tensordot(a, b, axes=1)
+        d = znp.tensordot(a, b, axes=([1], [0]))
         expected_d = np.array([[20, 23, 26, 29], [56, 68, 80, 92]])
         assert znp.allclose(d, expected_d)
-
-        e = znp.tensordot(a, b, axes=([1], [0]))
-        assert znp.allclose(e, expected_d)
 
 
 @pytest.mark.parametrize("backend", ["numpy"] + (["jax"] if HAS_JAX else []))

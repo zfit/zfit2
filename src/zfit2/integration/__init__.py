@@ -6,7 +6,8 @@ using both analytical and numerical methods.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from collections.abc import Callable
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -17,20 +18,20 @@ from zfit2.parameter import Parameter
 
 from .numerical import (
     integrate_gauss_legendre,
+    integrate_monte_carlo,
     integrate_simpson,
     integrate_trapezoid,
-    integrate_monte_carlo,
-    integrate_vegas
 )
+from .vegas import integrate_vegas
 
 
 def integrate(
-        func: Func,
-        limits: Union[Tuple[float, float], List[Tuple[float, float]]],
-        *,
-        parameters: Optional[Dict[str, Any]] = None,
-        method: str = "auto",
-        **kwargs
+    func: Func,
+    limits: Union[tuple[float, float], list[tuple[float, float]]],
+    *,
+    parameters: Optional[dict[str, Any]] = None,
+    method: str = "auto",
+    **kwargs,
 ) -> float:
     """Integrate a function over the specified limits.
 
@@ -47,7 +48,11 @@ def integrate(
         The integral value
     """
     # Try analytic integration if available and requested
-    if method in ("auto", "analytic") and hasattr(func, "integral") and func.properties.has_analytic_integral:
+    if (
+        method in ("auto", "analytic")
+        and hasattr(func, "integral")
+        and func.properties.has_analytic_integral
+    ):
         try:
             result = func.integral(limits, parameters=parameters, **kwargs)
             return result
@@ -58,19 +63,21 @@ def integrate(
 
     # Use numerical integration
     return integrate_numerically(
-        func, limits, parameters=parameters,
+        func,
+        limits,
+        parameters=parameters,
         method=(None if method == "auto" else method),
-        **kwargs
+        **kwargs,
     )
 
 
 def integrate_numerically(
-        func: Func,
-        limits: Union[Tuple[float, float], List[Tuple[float, float]]],
-        *,
-        parameters: Optional[Dict[str, Any]] = None,
-        method: Optional[str] = None,
-        **kwargs
+    func: Func,
+    limits: Union[tuple[float, float], list[tuple[float, float]]],
+    *,
+    parameters: Optional[dict[str, Any]] = None,
+    method: Optional[str] = None,
+    **kwargs,
 ) -> float:
     """Integrate a function numerically over the specified limits.
 
@@ -86,7 +93,11 @@ def integrate_numerically(
         The integral value
     """
     # Ensure limits is a list of tuples
-    if isinstance(limits, tuple) and len(limits) == 2 and all(isinstance(x, (int, float)) for x in limits):
+    if (
+        isinstance(limits, tuple)
+        and len(limits) == 2
+        and all(isinstance(x, (int, float)) for x in limits)
+    ):
         limits = [limits]
 
     # Determine dimensionality
@@ -118,4 +129,6 @@ def integrate_numerically(
     elif method == "vegas":
         return integrate_vegas(integrand, limits, **kwargs)
     else:
-        raise ValueError(f"Unsupported integration method '{method}' for {ndim}-dimensional integral")
+        raise ValueError(
+            f"Unsupported integration method '{method}' for {ndim}-dimensional integral"
+        )

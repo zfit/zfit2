@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import jax
-import jax.numpy as jnp
 
 from .backend import numpy as znp
 
 
 class Variable:
-    def __init__(self, name,*, label=None, lower=None, upper=None):
+    def __init__(self, name, *, label=None, lower=None, upper=None):
         self.name = name
         self.label = label if label is not None else name
         self.lower = lower
@@ -56,13 +55,36 @@ class Variables:
 
 
 def convert_to_variables(var):
+    from .parameter import Parameter, Parameters
+
+    if isinstance(var, Variable | Parameter):
+        return Variables(var)
+    if isinstance(var, Variables):
+        return var  # Already a Variables object, return as is
+    if isinstance(var, Parameters):
+        return Variables([v for v in var.params])  # Extract Parameter objects
     if isinstance(var, list | tuple):
-        return Variables([convert_to_variables(v) for v in var])
-    raise NotImplementedError
+        # Flatten the list and extract individual Variable/Parameter objects
+        flat_vars = []
+        for v in var:
+            if isinstance(v, Variable | Parameter):
+                flat_vars.append(v)
+            elif isinstance(v, Variables):
+                flat_vars.extend(v.variables)
+            elif isinstance(v, Parameters):
+                flat_vars.extend(v.params)
+            elif isinstance(v, list | tuple):
+                # Recursively convert nested lists/tuples
+                vars_obj = convert_to_variables(v)
+                flat_vars.extend(vars_obj.variables)
+            else:
+                raise TypeError(f"Cannot convert {type(v)} to Variables")
+        return Variables(flat_vars)
+    raise NotImplementedError(f"Cannot convert {type(var)} to Variables")
 
 
 # JAX PyTree registration for Variable class
-def _variable_flatten(var: Variable) -> Tuple[Tuple, Dict[str, Any]]:
+def _variable_flatten(var: Variable) -> tuple[tuple, dict[str, Any]]:
     """Flatten a Variable for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -74,7 +96,8 @@ def _variable_flatten(var: Variable) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _variable_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Variable:
+
+def _variable_unflatten(aux_data: dict[str, Any], children: tuple) -> Variable:
     """Unflatten a Variable from JAX PyTree."""
     return Variable(
         name=aux_data["name"],
@@ -83,9 +106,6 @@ def _variable_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Variable:
         upper=aux_data["upper"],
     )
 
+
 # Register Variable class with JAX
-jax.tree_util.register_pytree_node(
-    Variable,
-    _variable_flatten,
-    _variable_unflatten
-)
+jax.tree_util.register_pytree_node(Variable, _variable_flatten, _variable_unflatten)

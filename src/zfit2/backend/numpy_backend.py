@@ -602,6 +602,14 @@ class NumPyBackend(BackendBase):
         """Return elements chosen from `x` or `y` depending on `condition`."""
         return self._np.where(condition, x, y)
 
+    def all(self, a, axis=None, keepdims=False) -> Any:
+        """Test whether all array elements along a given axis evaluate to True."""
+        return self._np.all(a, axis=axis, keepdims=keepdims)
+
+    def any(self, a, axis=None, keepdims=False) -> Any:
+        """Test whether any array element along a given axis evaluates to True."""
+        return self._np.any(a, axis=axis, keepdims=keepdims)
+
     # Control flow operations
     def scan(self, f, init, xs, length=None, reverse=False) -> Any:
         """Scan a function over leading array axes while carrying along state."""

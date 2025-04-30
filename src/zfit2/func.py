@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import inspect
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from collections.abc import Callable, Sequence
+from typing import Any, Optional, Union
 
 import jax
 import jax.numpy as jnp
 
-from zfit2.backend import numpy as znp
-from zfit2.variable import Variable, Variables, convert_to_variables
 from zfit2.parameter import Parameter, Parameters
+from zfit2.variable import Variable, Variables, convert_to_variables
 
 
 class FuncProperties:
@@ -31,11 +30,11 @@ class Func:
     """
 
     def __init__(
-            self,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            codomain: Union[Variable, Variables, Sequence[Variable]],
-            parameters: Optional[Union[Parameter, Parameters, Sequence[Parameter]]] = None,
-            name: Optional[str] = None
+        self,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        codomain: Union[Variable, Variables, Sequence[Variable]],
+        parameters: Optional[Union[Parameter, Parameters, Sequence[Parameter]]] = None,
+        name: Optional[str] = None,
     ):
         """Initialize a function.
 
@@ -86,13 +85,13 @@ class Func:
         """Compose this function with another function: f(g(x))."""
         return ComposedFunc(self, other)
 
-    def with_parameters(self, parameters: Dict[str, Any]) -> Func:
+    def with_parameters(self, parameters: dict[str, Any]) -> Func:
         """Create a new function with updated parameter values."""
         new_func = self.__class__(
             domain=self.domain,
             codomain=self.codomain,
             parameters=self.parameters,
-            name=self.name
+            name=self.name,
         )
 
         # Update parameter values
@@ -108,7 +107,7 @@ class Func:
             self._jitted_func = jax.jit(self.__call__)
         return self._jitted_func
 
-    def grad(self, parameters: Optional[List[str]] = None) -> Callable:
+    def grad(self, parameters: Optional[list[str]] = None) -> Callable:
         """Return a function that computes the gradient w.r.t. parameters."""
         if parameters is None:
             parameters = [param.name for param in self.parameters.params]
@@ -116,7 +115,10 @@ class Func:
         def grad_func(*args, **kwargs):
             # Define a wrapper function that extracts parameters
             def wrapped(param_values):
-                param_dict = {name: value for name, value in zip(parameters, param_values)}
+                param_dict = {
+                    name: value
+                    for name, value in zip(parameters, param_values, strict=False)
+                }
                 return self(*args, parameters=param_dict, **kwargs)
 
             # Get current parameter values
@@ -132,13 +134,13 @@ class AnalyticFunc(Func):
     """A function defined by an analytic expression."""
 
     def __init__(
-            self,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            codomain: Union[Variable, Variables, Sequence[Variable]],
-            func: Callable,
-            parameters: Optional[Union[Parameter, Parameters, Sequence[Parameter]]] = None,
-            analytic_integral: Optional[Callable] = None,
-            name: Optional[str] = None
+        self,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        codomain: Union[Variable, Variables, Sequence[Variable]],
+        func: Callable,
+        parameters: Optional[Union[Parameter, Parameters, Sequence[Parameter]]] = None,
+        analytic_integral: Optional[Callable] = None,
+        name: Optional[str] = None,
     ):
         """Initialize an analytic function.
 
@@ -150,7 +152,9 @@ class AnalyticFunc(Func):
             analytic_integral: The analytic integral implementation
             name: Name of the function
         """
-        super().__init__(domain=domain, codomain=codomain, parameters=parameters, name=name)
+        super().__init__(
+            domain=domain, codomain=codomain, parameters=parameters, name=name
+        )
         self._func = func
         self._analytic_integral = analytic_integral
 
@@ -169,11 +173,25 @@ class AnalyticFunc(Func):
                 param_values[param.name] = param.value
 
         # Call the function
-        return self._func(x, **param_values, **kwargs)
+        # Handle both dictionary and non-dictionary inputs
+        if isinstance(x, dict):
+            return self._func(x, **param_values, **kwargs)
+        else:
+            # Convert to dictionary if domain has a single variable
+            if len(self.domain.variables) == 1:
+                var_name = self.domain.variables[0].name
+                return self._func({var_name: x}, **param_values, **kwargs)
+            else:
+                # For multiple variables, assume x is a tuple or list of values
+                var_dict = {var.name: val for var, val in zip(self.domain.variables, x)}
+                return self._func(var_dict, **param_values, **kwargs)
 
     def integral(self, limits, parameters=None, **kwargs) -> Any:
         """Calculate the integral of the function over the specified limits."""
-        if self.properties.has_analytic_integral and self._analytic_integral is not None:
+        if (
+            self.properties.has_analytic_integral
+            and self._analytic_integral is not None
+        ):
             # Prepare parameters
             param_values = {}
             if parameters is not None:
@@ -187,6 +205,7 @@ class AnalyticFunc(Func):
         else:
             # Fall back to numerical integration
             from zfit2.integration import integrate_numerically
+
             return integrate_numerically(self, limits, parameters=parameters, **kwargs)
 
 
@@ -200,21 +219,29 @@ class ComposedFunc(Func):
             outer_func: The outer function f
             inner_func: The inner function g
         """
-        if not isinstance(inner_func.codomain, Variables) or not isinstance(outer_func.domain, Variables):
-            raise TypeError("Both inner function codomain and outer function domain must be Variables")
+        if not isinstance(inner_func.codomain, Variables) or not isinstance(
+            outer_func.domain, Variables
+        ):
+            raise TypeError(
+                "Both inner function codomain and outer function domain must be Variables"
+            )
 
         # Check compatibility
         if len(inner_func.codomain.variables) != len(outer_func.domain.variables):
-            raise ValueError("Incompatible function composition: codomain and domain dimensions don't match")
+            raise ValueError(
+                "Incompatible function composition: codomain and domain dimensions don't match"
+            )
 
         # Create combined parameter list
-        combined_params = Parameters(inner_func.parameters.params + outer_func.parameters.params)
+        combined_params = Parameters(
+            inner_func.parameters.params + outer_func.parameters.params
+        )
 
         super().__init__(
             domain=inner_func.domain,
             codomain=outer_func.codomain,
             parameters=combined_params,
-            name=f"{outer_func.name}_{inner_func.name}"
+            name=f"{outer_func.name}_{inner_func.name}",
         )
 
         self.outer_func = outer_func
@@ -227,8 +254,8 @@ class ComposedFunc(Func):
         """Update properties based on component functions."""
         # A composed function is linear if both components are linear
         self.properties.is_linear = (
-                self.outer_func.properties.is_linear and
-                self.inner_func.properties.is_linear
+            self.outer_func.properties.is_linear
+            and self.inner_func.properties.is_linear
         )
 
         # A composed function has analytic integral under certain conditions
@@ -263,11 +290,11 @@ class PolynomialFunc(AnalyticFunc):
     """A polynomial function."""
 
     def __init__(
-            self,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            coefficients: Union[Parameter, Parameters, Sequence[Parameter]],
-            degree: Optional[int] = None,
-            name: Optional[str] = None
+        self,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        coefficients: Union[Parameter, Parameters, Sequence[Parameter]],
+        degree: Optional[int] = None,
+        name: Optional[str] = None,
     ):
         """Initialize a polynomial function.
 
@@ -298,10 +325,23 @@ class PolynomialFunc(AnalyticFunc):
 
         # Define the polynomial function
         def poly_func(x, **params):
-            x_val = x[0] if isinstance(x, tuple) else x
-            result = 0.0
-            for i, param_name in enumerate(params):
-                result += params[param_name] * x_val ** i
+            # Handle dictionary input
+            if isinstance(x, dict):
+                var_name = domain.variables[0].name
+                x_val = x[var_name]
+            else:
+                x_val = x[0] if isinstance(x, tuple) else x
+
+            # Use JAX-compatible approach to calculate polynomial
+            coeffs = [params[param_name] for param_name in sorted(params.keys())]
+            result = coeffs[0]  # Constant term
+
+            # Add higher-order terms
+            x_power = x_val
+            for coeff in coeffs[1:]:
+                result = result + coeff * x_power
+                x_power = x_power * x_val
+
             return result
 
         # Define the analytic integral
@@ -320,7 +360,7 @@ class PolynomialFunc(AnalyticFunc):
             func=poly_func,
             parameters=coeffs,
             analytic_integral=poly_integral,
-            name=name or "Polynomial"
+            name=name or "Polynomial",
         )
 
         # Set properties
@@ -336,12 +376,12 @@ class GaussianFunc(AnalyticFunc):
     """A Gaussian function: A * exp(-0.5 * ((x - mu) / sigma)^2)."""
 
     def __init__(
-            self,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            mu: Parameter,
-            sigma: Parameter,
-            amplitude: Optional[Parameter] = None,
-            name: Optional[str] = None
+        self,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        mu: Parameter,
+        sigma: Parameter,
+        amplitude: Optional[Parameter] = None,
+        name: Optional[str] = None,
     ):
         """Initialize a Gaussian function.
 
@@ -362,7 +402,14 @@ class GaussianFunc(AnalyticFunc):
 
         # Define the Gaussian function
         def gaussian_func(x, mu, sigma, amplitude=1.0, **kwargs):
-            x_val = x[0] if isinstance(x, tuple) else x
+            # Handle dictionary input
+            if isinstance(x, dict):
+                var_name = domain.variables[0].name
+                x_val = x[var_name]
+            else:
+                x_val = x[0] if isinstance(x, tuple) else x
+
+            # Use JAX-compatible approach
             exponent = -0.5 * ((x_val - mu) / sigma) ** 2
             return amplitude * jnp.exp(exponent)
 
@@ -378,7 +425,9 @@ class GaussianFunc(AnalyticFunc):
 
             # Calculate integral using error function
             sqrt_2 = jnp.sqrt(2.0)
-            integral = 0.5 * (special.erf(upper_std / sqrt_2) - special.erf(lower_std / sqrt_2))
+            integral = 0.5 * (
+                special.erf(upper_std / sqrt_2) - special.erf(lower_std / sqrt_2)
+            )
 
             # Multiply by amplitude and scaling factor
             return amplitude * sigma * jnp.sqrt(2 * jnp.pi) * integral
@@ -389,7 +438,7 @@ class GaussianFunc(AnalyticFunc):
             func=gaussian_func,
             parameters=Parameters(params),
             analytic_integral=gaussian_integral,
-            name=name or "Gaussian"
+            name=name or "Gaussian",
         )
 
         # Set properties
@@ -402,12 +451,12 @@ class GaussianFunc(AnalyticFunc):
 
 
 def create_function_from_callable(
-        func: Callable,
-        domain: Union[Variable, Variables, Sequence[Variable]],
-        parameters: Union[Parameter, Parameters, Sequence[Parameter]],
-        codomain: Optional[Union[Variable, Variables, Sequence[Variable]]] = None,
-        analytic_integral: Optional[Callable] = None,
-        name: Optional[str] = None
+    func: Callable,
+    domain: Union[Variable, Variables, Sequence[Variable]],
+    parameters: Union[Parameter, Parameters, Sequence[Parameter]],
+    codomain: Optional[Union[Variable, Variables, Sequence[Variable]]] = None,
+    analytic_integral: Optional[Callable] = None,
+    name: Optional[str] = None,
 ) -> AnalyticFunc:
     """Create a function from a callable.
 
@@ -431,5 +480,5 @@ def create_function_from_callable(
         func=func,
         parameters=parameters,
         analytic_integral=analytic_integral,
-        name=name or func.__name__
+        name=name or func.__name__,
     )

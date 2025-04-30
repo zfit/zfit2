@@ -62,10 +62,10 @@ class SymPyBackend(BackendBase):
         if isinstance(obj, (list, tuple, np.ndarray)):
             import sympy
 
-            try:
-                return sympy.Matrix(obj)
-            except:
-                return sympy.Array(obj)
+            # try:
+            #     return sympy.Matrix(obj)
+            # except:
+            return sympy.Array(obj)
         return obj
 
     def asarray(self, a, dtype=None, copy=None, device=None) -> Any:

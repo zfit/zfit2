@@ -7,9 +7,8 @@ both JAX-based automatic differentiation and numerical methods.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple, Union
-
-import numpy as np
+from collections.abc import Callable
+from typing import Any
 
 from .backend import numpy as znp
 from .valueholder import ValueHolder
@@ -39,7 +38,7 @@ class Differentiator:
         """
         self.use_jax = use_jax and _is_jax_available()
 
-    def grad(self, func: Callable, params: Dict[str, Any]) -> ValueHolder:
+    def grad(self, func: Callable, params: dict[str, Any]) -> ValueHolder:
         """Compute the gradient of a function.
 
         Args:
@@ -51,7 +50,7 @@ class Differentiator:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    def hess(self, func: Callable, params: Dict[str, Any]) -> ValueHolder:
+    def hess(self, func: Callable, params: dict[str, Any]) -> ValueHolder:
         """Compute the Hessian of a function.
 
         Args:
@@ -63,7 +62,9 @@ class Differentiator:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    def hvp(self, func: Callable, params: Dict[str, Any], vector: Dict[str, Any]) -> ValueHolder:
+    def hvp(
+        self, func: Callable, params: dict[str, Any], vector: dict[str, Any]
+    ) -> ValueHolder:
         """Compute the Hessian-vector product of a function.
 
         Args:
@@ -76,7 +77,9 @@ class Differentiator:
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-    def value_and_grad(self, func: Callable, params: Dict[str, Any]) -> Tuple[float, ValueHolder]:
+    def value_and_grad(
+        self, func: Callable, params: dict[str, Any]
+    ) -> tuple[float, ValueHolder]:
         """Compute both the function value and its gradient.
 
         Args:
@@ -98,12 +101,17 @@ class JaxDifferentiator(Differentiator):
         """Initialize the JAX differentiator."""
         super().__init__(use_jax=True)
         if not self.use_jax:
-            raise ImportError("JAX is not available. Please install JAX or use NumericalDifferentiator.")
+            raise ImportError(
+                "JAX is not available. Please install JAX or use NumericalDifferentiator."
+            )
 
         import jax
+
         self.jax = jax
 
-    def _prepare_params(self, params: Dict[str, Any]) -> Tuple[list, list, Dict[str, int]]:
+    def _prepare_params(
+        self, params: dict[str, Any]
+    ) -> tuple[list, list, dict[str, int]]:
         """Prepare parameters for JAX differentiation.
 
         Args:
@@ -127,12 +135,16 @@ class JaxDifferentiator(Differentiator):
         Returns:
             A function that accepts a flat list of parameters.
         """
+
         def wrapped(values):
-            params_dict = {name: value for name, value in zip(param_names, values)}
+            params_dict = {
+                name: value for name, value in zip(param_names, values, strict=False)
+            }
             return func(params_dict)
+
         return wrapped
 
-    def grad(self, func: Callable, params: Dict[str, Any]) -> ValueHolder:
+    def grad(self, func: Callable, params: dict[str, Any]) -> ValueHolder:
         """Compute the gradient using JAX.
 
         Args:
@@ -147,9 +159,11 @@ class JaxDifferentiator(Differentiator):
 
         grad_values = self.jax.grad(wrapped_func)(param_values)
 
-        return ValueHolder({name: value for name, value in zip(param_names, grad_values)})
+        return ValueHolder(
+            {name: value for name, value in zip(param_names, grad_values, strict=False)}
+        )
 
-    def hess(self, func: Callable, params: Dict[str, Any]) -> ValueHolder:
+    def hess(self, func: Callable, params: dict[str, Any]) -> ValueHolder:
         """Compute the Hessian using JAX.
 
         The implementation uses a combination of forward-mode and reverse-mode
@@ -178,7 +192,9 @@ class JaxDifferentiator(Differentiator):
 
         return ValueHolder(hess_dict)
 
-    def hvp(self, func: Callable, params: Dict[str, Any], vector: Dict[str, Any]) -> ValueHolder:
+    def hvp(
+        self, func: Callable, params: dict[str, Any], vector: dict[str, Any]
+    ) -> ValueHolder:
         """Compute the Hessian-vector product using JAX.
 
         This is more efficient than computing the full Hessian,
@@ -202,7 +218,9 @@ class JaxDifferentiator(Differentiator):
 
         hvp_values = hvp_func(param_values, vector_values)
 
-        return ValueHolder({name: value for name, value in zip(param_names, hvp_values)})
+        return ValueHolder(
+            {name: value for name, value in zip(param_names, hvp_values, strict=False)}
+        )
 
 
 class NumericalDifferentiator(Differentiator):
@@ -217,7 +235,7 @@ class NumericalDifferentiator(Differentiator):
         super().__init__(use_jax=False)
         self.step_size = step_size
 
-    def grad(self, func: Callable, params: Dict[str, Any]) -> ValueHolder:
+    def grad(self, func: Callable, params: dict[str, Any]) -> ValueHolder:
         """Compute the gradient using numerical differentiation.
 
         Uses central differences for better accuracy.
@@ -248,7 +266,7 @@ class NumericalDifferentiator(Differentiator):
 
         return ValueHolder(gradient)
 
-    def hess(self, func: Callable, params: Dict[str, Any]) -> ValueHolder:
+    def hess(self, func: Callable, params: dict[str, Any]) -> ValueHolder:
         """Compute the Hessian using numerical differentiation.
 
         Args:
@@ -287,7 +305,9 @@ class NumericalDifferentiator(Differentiator):
                     f_minus = func(params_minus)
 
                     # Second derivative (central difference)
-                    hessian[name_i][name_j] = (f_plus - 2 * f_center + f_minus) / (self.step_size ** 2)
+                    hessian[name_i][name_j] = (f_plus - 2 * f_center + f_minus) / (
+                        self.step_size**2
+                    )
 
                 # Off-diagonal elements
                 else:
@@ -316,12 +336,14 @@ class NumericalDifferentiator(Differentiator):
 
                     # Mixed partial derivative (central difference)
                     hessian[name_i][name_j] = (
-                                                      f_plus_plus - f_plus_minus - f_minus_plus + f_minus_minus
-                                              ) / (4 * self.step_size ** 2)
+                        f_plus_plus - f_plus_minus - f_minus_plus + f_minus_minus
+                    ) / (4 * self.step_size**2)
 
         return ValueHolder(hessian)
 
-    def hvp(self, func: Callable, params: Dict[str, Any], vector: Dict[str, Any]) -> ValueHolder:
+    def hvp(
+        self, func: Callable, params: dict[str, Any], vector: dict[str, Any]
+    ) -> ValueHolder:
         """Compute the Hessian-vector product using numerical differentiation.
 
         Uses the identity that HVP can be computed as a directional derivative
@@ -342,7 +364,7 @@ class NumericalDifferentiator(Differentiator):
         # First, normalize the vector
         vector_norm = znp.sqrt(sum(v**2 for v in vector.values()))
         if vector_norm < 1e-10:  # Avoid division by zero
-            return ValueHolder({name: 0.0 for name in params})
+            return ValueHolder(dict.fromkeys(params, 0.0))
 
         scale = self.step_size / vector_norm
         params_perturbed = params.copy()
@@ -357,14 +379,18 @@ class NumericalDifferentiator(Differentiator):
         hvp_values = {}
         for name in params:
             if name in grad_base and name in grad_perturbed:
-                hvp_values[name] = (grad_perturbed[name] - grad_base[name]) / self.step_size
+                hvp_values[name] = (
+                    grad_perturbed[name] - grad_base[name]
+                ) / self.step_size
             else:
                 hvp_values[name] = 0.0
 
         return ValueHolder(hvp_values)
 
 
-def create_differentiator(use_jax: bool = True, step_size: float = 1e-6) -> Differentiator:
+def create_differentiator(
+    use_jax: bool = True, step_size: float = 1e-6
+) -> Differentiator:
     """Create an appropriate differentiator based on the availability of JAX.
 
     Args:

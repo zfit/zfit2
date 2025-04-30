@@ -9,22 +9,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Dict, Generic, List, Literal, Optional, Tuple, TypeVar, Union, cast
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from typing import Tuple, Dict, Any
 
 
 class AxisTraits:
     """Traits for axes."""
 
     def __init__(
-        self, 
-        ordered: bool = True, 
-        discrete: bool = False, 
-        circular: bool = False
+        self, ordered: bool = True, discrete: bool = False, circular: bool = False
     ):
         self.ordered = ordered
         self.discrete = discrete
@@ -43,19 +45,21 @@ class AxisTraits:
 
 class OverflowBehavior(Enum):
     """Behavior for values outside the axis range."""
-    NONE = auto()    # No overflow/underflow bins
-    OVERFLOW = auto()    # Only overflow bin
-    UNDERFLOW = auto()   # Only underflow bin
-    BOTH = auto()    # Both overflow and underflow bins
+
+    NONE = auto()  # No overflow/underflow bins
+    OVERFLOW = auto()  # Only overflow bin
+    UNDERFLOW = auto()  # Only underflow bin
+    BOTH = auto()  # Both overflow and underflow bins
 
 
 @dataclass
 class Metadata:
     """Metadata for an axis."""
+
     name: str = ""
     label: str = ""
     # Allow arbitrary metadata storage
-    extra: Dict[str, Any] = None
+    extra: dict[str, Any] = None
 
     def __post_init__(self):
         if self.extra is None:
@@ -72,7 +76,7 @@ class Axis:
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: OverflowBehavior = OverflowBehavior.BOTH,
     ):
         self._metadata = Metadata(name=name, label=label, extra=metadata or {})
@@ -155,7 +159,7 @@ class RegularAxis(Axis):
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: OverflowBehavior = OverflowBehavior.BOTH,
         circular: bool = False,
     ):
@@ -192,7 +196,6 @@ class RegularAxis(Axis):
         """Get the bin edges of the axis."""
         return jnp.linspace(self._start, self._stop, self._bins + 1)
 
-
     # Updated RegularAxis.index method
     def index(self, value: Union[jnp.ndarray, float]) -> jnp.ndarray:
         """Get the bin index for a value."""
@@ -220,15 +223,15 @@ class RegularAxis(Axis):
                 jnp.where(
                     self.has_underflow,
                     jnp.array(-1, dtype=jnp.int32),  # Underflow bin
-                    jnp.zeros_like(index, dtype=jnp.int32)  # First bin
+                    jnp.zeros_like(index, dtype=jnp.int32),  # First bin
                 ),
                 # Overflow handling
                 jnp.where(
                     self.has_overflow,
                     jnp.array(self._bins, dtype=jnp.int32),  # Overflow bin
-                    jnp.array(self._bins - 1, dtype=jnp.int32)  # Last bin
-                )
-            )
+                    jnp.array(self._bins - 1, dtype=jnp.int32),  # Last bin
+                ),
+            ),
         )
 
         return index
@@ -246,11 +249,11 @@ class VariableAxis(Axis):
 
     def __init__(
         self,
-        edges: Union[List[float], np.ndarray, jnp.ndarray],
+        edges: Union[list[float], np.ndarray, jnp.ndarray],
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: OverflowBehavior = OverflowBehavior.BOTH,
         circular: bool = False,
     ):
@@ -307,15 +310,15 @@ class VariableAxis(Axis):
                 jnp.where(
                     self.has_underflow,
                     jnp.array(-1, dtype=jnp.int32),  # Underflow bin
-                    jnp.zeros_like(raw_index, dtype=jnp.int32)  # First bin
+                    jnp.zeros_like(raw_index, dtype=jnp.int32),  # First bin
                 ),
                 # Overflow handling
                 jnp.where(
                     self.has_overflow,
                     jnp.array(self.n_bins, dtype=jnp.int32),  # Overflow bin
-                    jnp.array(self.n_bins - 1, dtype=jnp.int32)  # Last bin
-                )
-            )
+                    jnp.array(self.n_bins - 1, dtype=jnp.int32),  # Last bin
+                ),
+            ),
         )
 
         return index
@@ -339,7 +342,7 @@ class IntegerAxis(Axis):
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: OverflowBehavior = OverflowBehavior.BOTH,
     ):
         """Initialize an integer axis.
@@ -395,15 +398,15 @@ class IntegerAxis(Axis):
                 jnp.where(
                     self.has_underflow,
                     -1,  # Underflow bin
-                    jnp.zeros_like(raw_index)  # First bin
+                    jnp.zeros_like(raw_index),  # First bin
                 ),
                 # Overflow handling
                 jnp.where(
                     self.has_overflow,
                     self.n_bins,  # Overflow bin
-                    self.n_bins - 1  # Last bin
-                )
-            )
+                    self.n_bins - 1,  # Last bin
+                ),
+            ),
         )
 
         return index
@@ -417,18 +420,19 @@ class IntegerAxis(Axis):
 
 
 # Type for categories
-T = TypeVar('T', str, int)
+T = TypeVar("T", str, int)
+
 
 class CategoryAxis(Generic[T]):
     """An axis for categorical data (strings or integers)."""
 
     def __init__(
         self,
-        categories: List[T],
+        categories: list[T],
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: bool = True,
         growth: bool = False,
     ):
@@ -477,7 +481,7 @@ class CategoryAxis(Generic[T]):
         return self._overflow
 
     @property
-    def categories(self) -> List[T]:
+    def categories(self) -> list[T]:
         """Get the categories of the axis."""
         return self._categories
 
@@ -512,7 +516,7 @@ class CategoryAxis(Generic[T]):
 
         return jnp.array(idx, dtype=jnp.int32)
 
-    def indices(self, values: List[T]) -> jnp.ndarray:
+    def indices(self, values: list[T]) -> jnp.ndarray:
         """Get the bin indices for a list of values."""
         return jnp.array([self.index(v).item() for v in values], dtype=jnp.int32)
 
@@ -540,11 +544,11 @@ class StrCategoryAxis(CategoryAxis[str]):
 
     def __init__(
         self,
-        categories: List[str],
+        categories: list[str],
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: bool = True,
         growth: bool = False,
     ):
@@ -574,11 +578,11 @@ class IntCategoryAxis(CategoryAxis[int]):
 
     def __init__(
         self,
-        categories: List[int],
+        categories: list[int],
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         overflow: bool = True,
         growth: bool = False,
     ):
@@ -611,7 +615,7 @@ class BooleanAxis(CategoryAxis[bool]):
         *,
         name: str = "",
         label: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Initialize a boolean axis."""
         super().__init__(
@@ -714,8 +718,9 @@ class NamedAxesTuple(AxesTuple):
 
 # JAX PyTree registration for Axis classes
 
+
 # RegularAxis
-def _regular_axis_flatten(axis: RegularAxis) -> Tuple[Tuple, Dict[str, Any]]:
+def _regular_axis_flatten(axis: RegularAxis) -> tuple[tuple, dict[str, Any]]:
     """Flatten a RegularAxis for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -731,7 +736,8 @@ def _regular_axis_flatten(axis: RegularAxis) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _regular_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> RegularAxis:
+
+def _regular_axis_unflatten(aux_data: dict[str, Any], children: tuple) -> RegularAxis:
     """Unflatten a RegularAxis from JAX PyTree."""
     return RegularAxis(
         bins=aux_data["bins"],
@@ -744,8 +750,11 @@ def _regular_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Regula
         circular=aux_data["circular"],
     )
 
+
 # VariableAxis
-def _variable_axis_flatten(axis: VariableAxis) -> Tuple[Tuple[jnp.ndarray], Dict[str, Any]]:
+def _variable_axis_flatten(
+    axis: VariableAxis,
+) -> tuple[tuple[jnp.ndarray], dict[str, Any]]:
     """Flatten a VariableAxis for JAX PyTree."""
     # The edges array is dynamic
     children = (axis._edges,)
@@ -758,9 +767,12 @@ def _variable_axis_flatten(axis: VariableAxis) -> Tuple[Tuple[jnp.ndarray], Dict
     }
     return children, aux_data
 
-def _variable_axis_unflatten(aux_data: Dict[str, Any], children: Tuple[jnp.ndarray]) -> VariableAxis:
+
+def _variable_axis_unflatten(
+    aux_data: dict[str, Any], children: tuple[jnp.ndarray]
+) -> VariableAxis:
     """Unflatten a VariableAxis from JAX PyTree."""
-    edges, = children
+    (edges,) = children
     return VariableAxis(
         edges=edges,
         name=aux_data["name"],
@@ -770,8 +782,9 @@ def _variable_axis_unflatten(aux_data: Dict[str, Any], children: Tuple[jnp.ndarr
         circular=aux_data["circular"],
     )
 
+
 # IntegerAxis
-def _integer_axis_flatten(axis: IntegerAxis) -> Tuple[Tuple, Dict[str, Any]]:
+def _integer_axis_flatten(axis: IntegerAxis) -> tuple[tuple, dict[str, Any]]:
     """Flatten an IntegerAxis for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -785,7 +798,8 @@ def _integer_axis_flatten(axis: IntegerAxis) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _integer_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> IntegerAxis:
+
+def _integer_axis_unflatten(aux_data: dict[str, Any], children: tuple) -> IntegerAxis:
     """Unflatten an IntegerAxis from JAX PyTree."""
     return IntegerAxis(
         start=aux_data["start"],
@@ -796,8 +810,9 @@ def _integer_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Intege
         overflow=aux_data["overflow"],
     )
 
+
 # CategoryAxis
-def _category_axis_flatten(axis: CategoryAxis) -> Tuple[Tuple, Dict[str, Any]]:
+def _category_axis_flatten(axis: CategoryAxis) -> tuple[tuple, dict[str, Any]]:
     """Flatten a CategoryAxis for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -811,7 +826,8 @@ def _category_axis_flatten(axis: CategoryAxis) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _category_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> CategoryAxis:
+
+def _category_axis_unflatten(aux_data: dict[str, Any], children: tuple) -> CategoryAxis:
     """Unflatten a CategoryAxis from JAX PyTree."""
     return CategoryAxis(
         categories=aux_data["categories"],
@@ -822,8 +838,9 @@ def _category_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Categ
         growth=aux_data["growth"],
     )
 
+
 # StrCategoryAxis
-def _str_category_axis_flatten(axis: StrCategoryAxis) -> Tuple[Tuple, Dict[str, Any]]:
+def _str_category_axis_flatten(axis: StrCategoryAxis) -> tuple[tuple, dict[str, Any]]:
     """Flatten a StrCategoryAxis for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -837,7 +854,10 @@ def _str_category_axis_flatten(axis: StrCategoryAxis) -> Tuple[Tuple, Dict[str, 
     }
     return children, aux_data
 
-def _str_category_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> StrCategoryAxis:
+
+def _str_category_axis_unflatten(
+    aux_data: dict[str, Any], children: tuple
+) -> StrCategoryAxis:
     """Unflatten a StrCategoryAxis from JAX PyTree."""
     return StrCategoryAxis(
         categories=aux_data["categories"],
@@ -848,8 +868,9 @@ def _str_category_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> S
         growth=aux_data["growth"],
     )
 
+
 # IntCategoryAxis
-def _int_category_axis_flatten(axis: IntCategoryAxis) -> Tuple[Tuple, Dict[str, Any]]:
+def _int_category_axis_flatten(axis: IntCategoryAxis) -> tuple[tuple, dict[str, Any]]:
     """Flatten an IntCategoryAxis for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -863,7 +884,10 @@ def _int_category_axis_flatten(axis: IntCategoryAxis) -> Tuple[Tuple, Dict[str, 
     }
     return children, aux_data
 
-def _int_category_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> IntCategoryAxis:
+
+def _int_category_axis_unflatten(
+    aux_data: dict[str, Any], children: tuple
+) -> IntCategoryAxis:
     """Unflatten an IntCategoryAxis from JAX PyTree."""
     return IntCategoryAxis(
         categories=aux_data["categories"],
@@ -874,8 +898,9 @@ def _int_category_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> I
         growth=aux_data["growth"],
     )
 
+
 # BooleanAxis
-def _boolean_axis_flatten(axis: BooleanAxis) -> Tuple[Tuple, Dict[str, Any]]:
+def _boolean_axis_flatten(axis: BooleanAxis) -> tuple[tuple, dict[str, Any]]:
     """Flatten a BooleanAxis for JAX PyTree."""
     # No dynamic values to track as children
     children = ()
@@ -886,7 +911,8 @@ def _boolean_axis_flatten(axis: BooleanAxis) -> Tuple[Tuple, Dict[str, Any]]:
     }
     return children, aux_data
 
-def _boolean_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> BooleanAxis:
+
+def _boolean_axis_unflatten(aux_data: dict[str, Any], children: tuple) -> BooleanAxis:
     """Unflatten a BooleanAxis from JAX PyTree."""
     return BooleanAxis(
         name=aux_data["name"],
@@ -894,45 +920,32 @@ def _boolean_axis_unflatten(aux_data: Dict[str, Any], children: Tuple) -> Boolea
         metadata=aux_data["metadata"],
     )
 
+
 # Register all axis classes with JAX
 jax.tree_util.register_pytree_node(
-    RegularAxis,
-    _regular_axis_flatten,
-    _regular_axis_unflatten
+    RegularAxis, _regular_axis_flatten, _regular_axis_unflatten
 )
 
 jax.tree_util.register_pytree_node(
-    VariableAxis,
-    _variable_axis_flatten,
-    _variable_axis_unflatten
+    VariableAxis, _variable_axis_flatten, _variable_axis_unflatten
 )
 
 jax.tree_util.register_pytree_node(
-    IntegerAxis,
-    _integer_axis_flatten,
-    _integer_axis_unflatten
+    IntegerAxis, _integer_axis_flatten, _integer_axis_unflatten
 )
 
 jax.tree_util.register_pytree_node(
-    CategoryAxis,
-    _category_axis_flatten,
-    _category_axis_unflatten
+    CategoryAxis, _category_axis_flatten, _category_axis_unflatten
 )
 
 jax.tree_util.register_pytree_node(
-    StrCategoryAxis,
-    _str_category_axis_flatten,
-    _str_category_axis_unflatten
+    StrCategoryAxis, _str_category_axis_flatten, _str_category_axis_unflatten
 )
 
 jax.tree_util.register_pytree_node(
-    IntCategoryAxis,
-    _int_category_axis_flatten,
-    _int_category_axis_unflatten
+    IntCategoryAxis, _int_category_axis_flatten, _int_category_axis_unflatten
 )
 
 jax.tree_util.register_pytree_node(
-    BooleanAxis,
-    _boolean_axis_flatten,
-    _boolean_axis_unflatten
+    BooleanAxis, _boolean_axis_flatten, _boolean_axis_unflatten
 )

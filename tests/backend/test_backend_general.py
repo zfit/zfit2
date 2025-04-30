@@ -8,9 +8,11 @@ import pytest
 from zfit2.backend import (
     BackendError,
     NotImplementedInBackend,
+    backend,
     get_backend,
     set_backend,
 )
+from zfit2.backend import numpy as znp
 
 
 def test_backend_switching():
@@ -44,14 +46,14 @@ def test_array_creation():
     set_backend("numpy")
 
     # Create array
-    a = array([1, 2, 3])
+    a = znp.array([1, 2, 3])
     assert isinstance(a, np.ndarray)
     assert np.array_equal(a, np.array([1, 2, 3]))
 
     # Test JAX backend if available
     try:
         set_backend("jax")
-        a = array([1, 2, 3])
+        a = znp.array([1, 2, 3])
         assert np.array_equal(np.array(a), np.array([1, 2, 3]))
     except (ImportError, BackendError):
         pytest.skip("JAX not available")
@@ -63,9 +65,9 @@ def test_math_operations():
     set_backend("numpy")
 
     # Test sqrt
-    a = array([1, 4, 9])
-    b = sqrt(a)
-    assert np.allclose(b, np.array([1, 2, 3]))
+    a = znp.array([1, 4, 9])
+    b = znp.sqrt(a)
+    np.testing.assert_allclose(b, np.array([1, 2, 3]))
 
 
 def test_gradient():
@@ -77,13 +79,13 @@ def test_gradient():
 
     # Use NumPy backend
     set_backend("numpy")
-    np_grad = grad(f)
+    np_grad = backend.grad(f)
     assert np.isclose(np_grad(2.0), 4.0)
 
     # Use JAX backend if available
     try:
         set_backend("jax")
-        jax_grad = grad(f)
+        jax_grad = backend.grad(f)
         assert np.isclose(jax_grad(2.0), 4.0)
     except (ImportError, BackendError):
         pytest.skip("JAX not available")
@@ -98,13 +100,13 @@ def test_hessian():
 
     # Use NumPy backend
     set_backend("numpy")
-    np_hess = hessian(f)
+    np_hess = backend.hessian(f)
     assert np.isclose(np_hess(2.0), 12.0)
 
     # Use JAX backend if available
     try:
         set_backend("jax")
-        jax_hess = hessian(f)
+        jax_hess = backend.hessian(f)
         assert np.isclose(jax_hess(2.0), 12.0)
     except (ImportError, BackendError):
         pytest.skip("JAX not available")

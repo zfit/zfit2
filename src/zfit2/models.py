@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Optional, Union
 
-import jax
 import jax.numpy as jnp
 
-from zfit2.backend import numpy as znp
 from zfit2.dist import Distribution
-from zfit2.func import Func, AnalyticFunc
+from zfit2.func import Func
+from zfit2.integration import integrate
 from zfit2.parameter import Parameter, Parameters
 from zfit2.variable import Variable, Variables, convert_to_variables
-from zfit2.integration import integrate
 
 
 class Model(Distribution):
@@ -21,12 +20,14 @@ class Model(Distribution):
     """
 
     def __init__(
-            self,
-            func: Func,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            norm_range: Optional[Union[Tuple[float, float], List[Tuple[float, float]]]] = None,
-            name: Optional[str] = None,
-            label: Optional[str] = None
+        self,
+        func: Func,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        norm_range: Optional[
+            Union[tuple[float, float], list[tuple[float, float]]]
+        ] = None,
+        name: Optional[str] = None,
+        label: Optional[str] = None,
     ):
         """Initialize a model.
 
@@ -38,19 +39,23 @@ class Model(Distribution):
             label: Label of the model
         """
         self.func = func
-        self.norm_range = norm_range or self._default_norm_range(domain)
+        # Convert domain to Variables
+        domain_vars = convert_to_variables(domain)
+        self.norm_range = norm_range or self._default_norm_range(domain_vars)
 
         super().__init__(
-            domain=domain,
+            domain=domain_vars,
             params=func.parameters,
             name=name or f"Model_{func.name}",
-            label=label or f"Model of {func.name}"
+            label=label or f"Model of {func.name}",
         )
 
         # Cache for normalization factor
         self._norm_factor = None
 
-    def _default_norm_range(self, domain: Union[Variable, Variables, Sequence[Variable]]) -> List[Tuple[float, float]]:
+    def _default_norm_range(
+        self, domain: Union[Variable, Variables, Sequence[Variable]]
+    ) -> list[tuple[float, float]]:
         """Get default normalization range from domain."""
         domain_vars = convert_to_variables(domain)
         return [(var.lower, var.upper) for var in domain_vars.variables]
@@ -110,6 +115,7 @@ class Model(Distribution):
         """Sample from the model."""
         # For now, use rejection sampling
         from zfit2.sampling import rejection_sample
+
         return rejection_sample(self, size, params=params, norm=norm)
 
 
@@ -147,13 +153,13 @@ class GaussianModel(Model):
     """Gaussian model: A * exp(-0.5 * ((x - mu) / sigma)^2)."""
 
     def __init__(
-            self,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            mu: Parameter,
-            sigma: Parameter,
-            amplitude: Optional[Parameter] = None,
-            name: Optional[str] = None,
-            label: Optional[str] = None
+        self,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        mu: Parameter,
+        sigma: Parameter,
+        amplitude: Optional[Parameter] = None,
+        name: Optional[str] = None,
+        label: Optional[str] = None,
     ):
         """Initialize a Gaussian model.
 
@@ -168,13 +174,19 @@ class GaussianModel(Model):
         from zfit2.func import GaussianFunc
 
         # Create Gaussian function
-        func = GaussianFunc(domain=domain, mu=mu, sigma=sigma, amplitude=amplitude, name=f"GaussianFunc_{name}")
+        func = GaussianFunc(
+            domain=domain,
+            mu=mu,
+            sigma=sigma,
+            amplitude=amplitude,
+            name=f"GaussianFunc_{name}",
+        )
 
         super().__init__(
             func=func,
             domain=domain,
             name=name or "GaussianModel",
-            label=label or "Gaussian Model"
+            label=label or "Gaussian Model",
         )
 
 
@@ -182,12 +194,12 @@ class PolynomialModel(Model):
     """Polynomial model: sum(a_i * x^i)."""
 
     def __init__(
-            self,
-            domain: Union[Variable, Variables, Sequence[Variable]],
-            coefficients: Union[Parameter, Parameters, Sequence[Parameter]],
-            degree: Optional[int] = None,
-            name: Optional[str] = None,
-            label: Optional[str] = None
+        self,
+        domain: Union[Variable, Variables, Sequence[Variable]],
+        coefficients: Union[Parameter, Parameters, Sequence[Parameter]],
+        degree: Optional[int] = None,
+        name: Optional[str] = None,
+        label: Optional[str] = None,
     ):
         """Initialize a polynomial model.
 
@@ -205,12 +217,12 @@ class PolynomialModel(Model):
             domain=domain,
             coefficients=coefficients,
             degree=degree,
-            name=f"PolyFunc_{name}"
+            name=f"PolyFunc_{name}",
         )
 
         super().__init__(
             func=func,
             domain=domain,
             name=name or "PolynomialModel",
-            label=label or "Polynomial Model"
+            label=label or "Polynomial Model",
         )

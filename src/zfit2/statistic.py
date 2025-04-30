@@ -1,6 +1,7 @@
-import jax
+from __future__ import annotations
+
 from jax import numpy as jnp
-from jax import random
+
 
 class Statistics:
     """
@@ -69,7 +70,7 @@ class Chi2(Statistics):
         """
         if variance <= 0:
             return 0.0  # Avoid division by zero
-        return jnp.sum(((data - mean)**2) / variance)
+        return jnp.sum(((data - mean) ** 2) / variance)
 
 
 class Mean(Statistics):

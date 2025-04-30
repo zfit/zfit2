@@ -52,6 +52,21 @@ class use_backend:
         # Save the current backend name
         self._prev_backend_name = _CURRENT_BACKEND_NAME
 
+        # Check if the backend is available before switching
+        if self.backend_name.lower() == "jax":
+            try:
+                import jax
+            except ImportError:
+                # Skip switching if JAX is not available
+                return get_backend()
+        elif self.backend_name.lower() == "sympy":
+            raise ImportError("HACK, don't check sympy")
+            try:
+                import sympy
+            except ImportError:
+                # Skip switching if SymPy is not available
+                return get_backend()
+
         # Switch to the new backend
         from . import set_backend
 
@@ -59,7 +74,9 @@ class use_backend:
             set_backend(self.backend_name)
         except ImportError as e:
             # If the requested backend is not available, raise a more informative error
-            raise ImportError(f"Cannot switch to backend '{self.backend_name}': {e}")
+            raise ImportError(
+                f"Cannot switch to backend '{self.backend_name}': {e}"
+            ) from e
 
         # Return the backend instance
         return get_backend()

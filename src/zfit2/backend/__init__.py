@@ -103,7 +103,7 @@ def get_backend(name: Optional[Literal["jax", "numpy", "sympy"]] = None) -> Back
         )
 
 
-def set_backend(name: Literal["jax", "numpy", "sympy"]) -> None:
+def set_backend(name: Literal["jax", "numpy", "sympy"] | None = None) -> None:
     """Set the active backend.
 
     Args:
@@ -114,6 +114,8 @@ def set_backend(name: Literal["jax", "numpy", "sympy"]) -> None:
     """
     global _CURRENT_BACKEND_NAME
     # Get the backend to initialize it and validate
+    if name is None:
+        name = "jax" if _JAX_BACKEND else "numpy"
     get_backend(name)
     _CURRENT_BACKEND_NAME = name.lower()
 
@@ -123,6 +125,14 @@ class BackendInterface:
 
     def __getattr__(self, name: str) -> Any:
         """Get an attribute from the active backend."""
+        return getattr(get_backend(), name)
+
+
+class NumPyInterface:
+    """NumPy-like interface to the active backend's mathematical operations."""
+
+    def __getattr__(self, name: str) -> Any:
+        """Get math functions from the active backend."""
         return getattr(get_backend(), name)
 
 
@@ -138,16 +148,19 @@ if "ZFIT_BACKEND" in os.environ:
         )
 
 
-# Expose the interface
+# Expose the interfaces
 backend = BackendInterface()
+numpy = NumPyInterface()
 
-# Expose common functions for direct imports
+# Expose common functions - these are now accessed through the interfaces
+# but listed here for backwards compatibility and easier imports
 from .optimize import curve_fit, minimize, root
 from .vectorize import vmap
 
 __all__ = [
-    # Main interface
+    # Main interfaces
     "backend",
+    "numpy",
     # Backend management
     "get_backend",
     "set_backend",

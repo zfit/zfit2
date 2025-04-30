@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -100,7 +100,7 @@ class Parameters(Variables):
 
 
 # JAX PyTree registration for Parameter class
-def _parameter_flatten(param: Parameter) -> Tuple[Tuple[float], Dict[str, Any]]:
+def _parameter_flatten(param: Parameter) -> tuple[tuple[float], dict[str, Any]]:
     """Flatten a Parameter for JAX PyTree."""
     # The value is dynamic
     children = (param.value,)
@@ -115,9 +115,10 @@ def _parameter_flatten(param: Parameter) -> Tuple[Tuple[float], Dict[str, Any]]:
     }
     return children, aux_data
 
-def _parameter_unflatten(aux_data: Dict[str, Any], children: Tuple[float]) -> Parameter:
+
+def _parameter_unflatten(aux_data: dict[str, Any], children: tuple[float]) -> Parameter:
     """Unflatten a Parameter from JAX PyTree."""
-    value, = children
+    (value,) = children
     return Parameter(
         name=aux_data["name"],
         value=value,
@@ -129,9 +130,6 @@ def _parameter_unflatten(aux_data: Dict[str, Any], children: Tuple[float]) -> Pa
         label=aux_data["label"],
     )
 
+
 # Register Parameter class with JAX
-jax.tree_util.register_pytree_node(
-    Parameter,
-    _parameter_flatten,
-    _parameter_unflatten
-)
+jax.tree_util.register_pytree_node(Parameter, _parameter_flatten, _parameter_unflatten)

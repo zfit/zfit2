@@ -11,18 +11,29 @@ from __future__ import annotations
 
 from . import axis
 from .axis import (
-    Axis,
-    BooleanAxis as Boolean,
-    CategoryAxis,
-    IntCategoryAxis as IntCategory,
-    IntegerAxis as Integer,
-    RegularAxis as Regular,
-    StrCategoryAxis as StrCategory,
-    VariableAxis as Variable,
     AxesTuple,
+    Axis,
+    CategoryAxis,
     NamedAxesTuple,
 )
-
+from .axis import (
+    BooleanAxis as Boolean,
+)
+from .axis import (
+    IntCategoryAxis as IntCategory,
+)
+from .axis import (
+    IntegerAxis as Integer,
+)
+from .axis import (
+    RegularAxis as Regular,
+)
+from .axis import (
+    StrCategoryAxis as StrCategory,
+)
+from .axis import (
+    VariableAxis as Variable,
+)
 from .histogram import (
     Accumulator,
     Count,
@@ -32,7 +43,6 @@ from .histogram import (
     WeightedMean,
     WeightedSum,
 )
-
 from .utils import (
     grad_bin_count,
     hist,
@@ -58,7 +68,6 @@ __all__ = [
     "Regular",
     "StrCategory",
     "Variable",
-
     # Histogram classes
     "Accumulator",
     "Count",
@@ -67,7 +76,6 @@ __all__ = [
     "NamedHist",
     "WeightedMean",
     "WeightedSum",
-
     # Utility functions
     "grad_bin_count",
     "hist",
@@ -75,7 +83,6 @@ __all__ = [
     "histogramdd",
     "jit_fill",
     "vmap_fill",
-
     # Version
     "__version__",
 ]
