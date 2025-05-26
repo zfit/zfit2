@@ -32,7 +32,7 @@ jobs:
         run: |
           echo "::add-matcher::$GITHUB_WORKSPACE/.github/matchers/pylint.json"
       #          pipx run nox -s pylint  # TODO: reactivate once serious
-      - uses: scientific-python/repo-review@v0.12.1
+      - uses: scientific-python/repo-review@v0.12.2
         with:
           plugins: sp-repo-review
 
