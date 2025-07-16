@@ -48,7 +48,7 @@ jobs:
     # This is faster than setting up full pixi environments for simple import validation
     name: Import Test Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}
-    needs: [pre-commit]
+#    needs: [pre-commit]
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -116,7 +116,7 @@ jobs:
     # Pixi automatically handles the editable install via [tool.pixi.pypi-dependencies]
     name: Test Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}
-    needs: [pre-commit]
+#    needs: [pre-commit]
     timeout-minutes: 30
     strategy:
       fail-fast: false
