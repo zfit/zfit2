@@ -1,6 +1,6 @@
-"""Unbinned data container for zfit2.
+"""Unbinned data collection for zfit2.
 
-This module provides a DataFrame-like container for unbinned data,
+This module provides a DataFrame-like collection for unbinned data,
 backed by JAX arrays for efficient computation.
 """
 

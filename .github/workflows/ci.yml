@@ -30,7 +30,6 @@ jobs:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
           environments: lint
-          manifest-path: pyproject.toml
       
       - name: Run pre-commit
         run: pixi run -e lint pre-commit
@@ -140,7 +139,6 @@ jobs:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
           environments: py${{ matrix.python-version }}
-          manifest-path: pyproject.toml
       
       - name: Verify editable install
         run: |
@@ -185,7 +183,6 @@ jobs:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
           environments: default
-          manifest-path: pyproject.toml
       
       - name: Download all coverage data
         uses: actions/download-artifact@v4
@@ -219,7 +216,6 @@ jobs:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
           environments: docs
-          manifest-path: pyproject.toml
       
       - name: Build documentation
         run: pixi run -e docs docs-build

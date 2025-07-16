@@ -12,7 +12,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from ..util import to_container
+from ..util import to_collection
 from .basestatistic import BaseStatistic
 from .options import NLLOptions
 
@@ -24,11 +24,15 @@ class BaseNLL(BaseStatistic, ABC):
     with preprocessing of inputs and private methods for the actual computation.
     """
 
-    def value(self, *args, **kwargs) -> float | jnp.ndarray:
+    def value(self, *args, full: bool = False, **kwargs) -> float | jnp.ndarray:
         """Compute the statistic value with preprocessing.
 
         This method preprocesses inputs before calling the private
         _value method for the actual computation.
+
+        Args:
+            full: If True, compute the full value without any offset or approximation.
+                  If False (default), apply offsets and approximations as configured.
 
         Returns:
             The computed statistic value
@@ -38,16 +42,20 @@ class BaseNLL(BaseStatistic, ABC):
             hasattr(self, "precompile")
             and hasattr(self, "_precompiled")
             and not self._precompiled
+            and not full
         ):
             self.precompile(*args, **kwargs)
 
-        return self._value(*args, **kwargs)
+        return self._value(*args, full=full, **kwargs)
 
     @abstractmethod
-    def _value(self, *args, **kwargs) -> float | jnp.ndarray:
+    def _value(self, *args, full: bool = False, **kwargs) -> float | jnp.ndarray:
         """Private method for computing the actual statistic value.
 
         This method must be implemented by subclasses.
+
+        Args:
+            full: If True, compute full value without offset
 
         Returns:
             The computed statistic value
@@ -136,15 +144,15 @@ class NLL(BaseNLL):
             label: Human-readable label (default: "Negative Log-Likelihood")
         """
         if options is None:
-            options = NLLOptions.mean(start_value=10000.0)
+            options = NLLOptions.default()
         if label is None:
             label = "Negative Log-Likelihood"
 
         super().__init__(name=name, label=label)
 
-        # Convert to lists for consistency using the helper function
-        dists = list(to_container(dists, container_type=list, force=True))
-        data = list(to_container(data, container_type=list, force=True))
+        # Convert to collections (as lists) for consistency
+        dists = to_collection(dists, collection_type=list, force=True)
+        data = to_collection(data, collection_type=list, force=True)
 
         # Check lengths match - no broadcasting allowed
         if len(dists) != len(data):
@@ -230,8 +238,13 @@ class NLL(BaseNLL):
         # Get initial logpdf values
         loglike_values = self._loglike(params)
 
-        # Get offset method
-        method = self.options.get_offset_method()
+        # Get offset configuration
+        offset_config = self.options.get_offset_config()
+        if offset_config is None:
+            # No offset configured, use default
+            offset_config = {"method": "mean", "start_value": 10000.0}
+
+        method = offset_config["method"]
 
         # Calculate offset based on method
         if method == "none":
@@ -244,23 +257,27 @@ class NLL(BaseNLL):
             # Calculate adjustment
             adjusted_loglike = loglike_values - self._offset_values
             current_nll = -jnp.sum(adjusted_loglike)
-            self._adjustment = self.options.start_value - current_nll
+            self._adjustment = offset_config.get("start_value", 0.0) - current_nll
         elif method == "median":
             offset = jnp.median(loglike_values)
             self._offset_values = jnp.full_like(loglike_values, offset)
             # Calculate adjustment
             adjusted_loglike = loglike_values - self._offset_values
             current_nll = -jnp.sum(adjusted_loglike)
-            self._adjustment = self.options.start_value - current_nll
+            self._adjustment = offset_config.get("start_value", 0.0) - current_nll
         elif method == "elementwise":
             self._offset_values = loglike_values
             # Calculate adjustment
             adjusted_loglike = loglike_values - self._offset_values
             current_nll = -jnp.sum(adjusted_loglike)
-            self._adjustment = self.options.start_value - current_nll
+            self._adjustment = offset_config.get("start_value", 0.0) - current_nll
         elif method == "custom":
             # Custom offset function
-            self._offset_values = self.options.offset(loglike_values)
+            custom_fn = offset_config.get("function")
+            if custom_fn is None:
+                msg = "Custom offset method configured but no function provided"
+                raise ValueError(msg)
+            self._offset_values = custom_fn(loglike_values)
             # For custom functions, we don't adjust
             self._adjustment = 0.0
         else:
@@ -272,30 +289,36 @@ class NLL(BaseNLL):
 
         self._precompiled = True
 
-    def _value(self, params: dict | None = None) -> jnp.ndarray:
+    def _value(self, params: dict | None = None, full: bool = False) -> jnp.ndarray:
         """Compute the negative log-likelihood.
 
         Args:
             params: Optional parameter values
+            full: If True, compute full value without offset
 
         Returns:
             The negative log-likelihood value
         """
-        # Precompile on first call
-        if not self._precompiled:
-            self.precompile(params)
-
         # Compute log-likelihood values
         loglike_values = self._loglike(params)
 
-        # Apply offset
-        adjusted_loglike = loglike_values - self._offset_values
+        if full:
+            # No offset, just return negative sum
+            summed = self._sum(loglike_values)
+            return -summed
+        else:
+            # Precompile on first call
+            if not self._precompiled:
+                self.precompile(params)
 
-        # Sum them
-        summed = self._sum(adjusted_loglike)
+            # Apply offset
+            adjusted_loglike = loglike_values - self._offset_values
 
-        # Return negative plus adjustment
-        return -summed + self._adjustment
+            # Sum them
+            summed = self._sum(adjusted_loglike)
+
+            # Return negative plus adjustment
+            return -summed + self._adjustment
 
 
 # JAX PyTree registration for NLL
