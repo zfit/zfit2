@@ -8,10 +8,16 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def setup_teardown():
-    import zfit2
+    # Set random seeds for reproducibility
+    import random
+
+    import numpy as np
+
+    np.random.seed(42)
+    random.seed(42)
 
     # reset the backend to default
-    zfit2.backend.set_backend()
+    # zfit2.backend.set_backend()
 
     import gc
 

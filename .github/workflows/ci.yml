@@ -13,55 +13,254 @@ concurrency:
 
 env:
   FORCE_COLOR: 3
+  PIXI_VERSION: v0.36.0
 
 jobs:
   pre-commit:
-    name: Format
+    name: Format & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      
+      - uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          python-version: "3.x"
-      - uses: pre-commit/action@v3.0.1
-        with:
-          extra_args: --hook-stage manual --all-files
+          pixi-version: ${{ env.PIXI_VERSION }}
+          cache: true
+          environments: lint
+          manifest-path: pyproject.toml
+      
+      - name: Run pre-commit
+        run: pixi run -e lint pre-commit
+      
       - name: Run PyLint
         run: |
           echo "::add-matcher::$GITHUB_WORKSPACE/.github/matchers/pylint.json"
-      #          pipx run nox -s pylint  # TODO: reactivate once serious
+          pixi run -e lint pylint || true  # Allow pylint to fail for now
+      
       - uses: scientific-python/repo-review@v0.12.1
         with:
           plugins: sp-repo-review
 
-  tests:
-    name: Check Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
+  import:
+    # Use uv for quick import tests across all Python versions and platforms
+    # This is faster than setting up full pixi environments for simple import validation
+    name: Import Test Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
     runs-on: ${{ matrix.runs-on }}
     needs: [pre-commit]
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         runs-on: [ubuntu-latest, macos-latest, windows-latest]
-
+    
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+      
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-
-      - name: Install package
-        run: python -m pip install .[test]
-
-      - name: Test package
+      
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            requirements*.txt
+      
+      - name: Install package with uv
         run: |
-          python -m pytest -ra --cov --cov-report=xml --cov-report=term --durations=20
+          uv pip install --system -e ".[test]"
+      
+      - name: Test all imports
+        run: |
+          python -c "
+          import sys
+          print(f'Python {sys.version}')
+          print(f'Platform: {sys.platform}')
+          
+          # Test main imports
+          import zfit2
+          print('✅ zfit2')
+          
+          from zfit2 import Parameter, Variable
+          print('✅ Parameter, Variable')
+          
+          from zfit2.data import UnbinnedData
+          print('✅ UnbinnedData')
+          
+          from zfit2.statistic import NLL
+          print('✅ NLL')
+          
+          from zfit2.minimizer import BaseMinimizer
+          print('✅ BaseMinimizer')
+          
+          from zfit2.dist import BaseDist
+          print('✅ BaseDist')
+          
+          from zfit2.interface import MinimizeResult
+          print('✅ MinimizeResult')
+          
+          print()
+          print('All imports successful! 🎉')
+          "
 
-      - name: Upload coverage report
+  tests:
+    # Use pixi for full test suite to ensure conda dependencies (jax, jaxlib, scipy) are properly installed
+    # Pixi automatically handles the editable install via [tool.pixi.pypi-dependencies]
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runs-on }}
+    needs: [pre-commit]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Test minimal Python version (3.10) on all OS
+          - {python-version: "3.10", runs-on: ubuntu-latest}
+          - {python-version: "3.10", runs-on: macos-latest}
+          - {python-version: "3.10", runs-on: windows-latest}
+          # Test maximal Python version (3.13) on Ubuntu only
+          - {python-version: "3.13", runs-on: ubuntu-latest}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          cache: true
+          environments: py${{ matrix.python-version }}
+          manifest-path: pyproject.toml
+      
+      - name: Verify editable install
+        run: |
+          pixi run -e py${{ matrix.python-version }} python -c "
+          import zfit2
+          import os
+          print(f'zfit2 version: {zfit2.__version__ if hasattr(zfit2, \"__version__\") else \"unknown\"}')
+          print(f'zfit2 location: {zfit2.__file__}')
+          # Check if it's an editable install by verifying the path points to src/
+          if 'src/zfit2' in zfit2.__file__:
+              print('✅ Editable install confirmed')
+          else:
+              print('❌ Not an editable install!')
+              exit(1)
+          "
+      
+      - name: Test package
+        run: pixi run -e py${{ matrix.python-version }} test-ci
+      
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        if: matrix.runs-on == 'ubuntu-latest'
+        with:
+          name: coverage-py${{ matrix.python-version }}-${{ matrix.runs-on }}
+          path: .coverage.*
+          retention-days: 7
+
+  coverage:
+    name: Coverage Report
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          cache: true
+          environments: default
+          manifest-path: pyproject.toml
+      
+      - name: Download all coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+      
+      - name: Combine and report coverage
+        run: |
+          pixi run python -m coverage combine
+          pixi run coverage-report
+      
+      - name: Upload to Codecov
         uses: codecov/codecov-action@v5.4.2
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          cache: true
+          environments: docs
+          manifest-path: pyproject.toml
+      
+      - name: Build documentation
+        run: pixi run -e docs docs-build
+      
+      - name: Check documentation links
+        run: pixi run -e docs docs-linkcheck
+
+  all-checks-pass:
+    name: All checks passed
+    if: always()
+    needs: [pre-commit, import, tests, coverage, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all jobs passed
+        shell: bash
+        run: |
+          # Check job results
+          PRE_COMMIT="${{ needs.pre-commit.result }}"
+          IMPORT="${{ needs.import.result }}"
+          TESTS="${{ needs.tests.result }}"
+          COVERAGE="${{ needs.coverage.result }}"
+          DOCS="${{ needs.docs.result }}"
+          
+          # Print status
+          echo "Job Results:"
+          echo "  pre-commit: $PRE_COMMIT"
+          echo "  import: $IMPORT"
+          echo "  tests: $TESTS"
+          echo "  coverage: $COVERAGE"
+          echo "  docs: $DOCS"
+          echo
+          
+          # Check if all succeeded
+          if [[ "$PRE_COMMIT" == "success" ]] && \
+             [[ "$IMPORT" == "success" ]] && \
+             [[ "$TESTS" == "success" ]] && \
+             [[ "$COVERAGE" == "success" ]] && \
+             [[ "$DOCS" == "success" ]]; then
+            echo "✅ All checks passed!"
+            exit 0
+          else
+            echo "❌ One or more jobs failed"
+            exit 1
+          fi

@@ -168,3 +168,95 @@ messages_control.disable = [
   "missing-module-docstring",
   "wrong-import-position",
 ]
+
+
+# ===== Pixi Configuration =====
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.dependencies]
+# Conda-specific dependencies that aren't in project.dependencies
+# Note: numpy, scipy, jax are already in project.dependencies and will be installed from conda-forge
+jaxlib = "*"
+
+[tool.pixi.pypi-dependencies]
+zfit2 = { path = ".", editable = true }
+
+[tool.pixi.host-dependencies]
+# Build dependencies - pixi will also read from build-system.requires
+pip = "*"
+setuptools = "*"
+wheel = "*"
+
+# Pixi will automatically create features from project.optional-dependencies
+# We can add conda-specific dependencies to those features here
+[tool.pixi.feature.test.dependencies]
+# Additional conda dependencies for testing
+pytest-xdist = "*"
+coverage = ">=7.0"
+
+[tool.pixi.feature.docs.dependencies]
+# Additional conda dependencies for docs (if needed)
+
+[tool.pixi.feature.lint.dependencies]
+# Linting tools from conda-forge
+pre-commit = "*"
+ruff = ">=0.1"
+mypy = "*"
+pylint = "*"
+
+[tool.pixi.feature.dev.dependencies]
+# Development tools
+ipython = "*"
+jupyterlab = "*"
+build = "*"
+
+# Python version-specific features
+[tool.pixi.feature.py310.dependencies]
+python = "3.10.*"
+
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.environments]
+# Default environment includes test dependencies
+default = {features = ["test", "lint", "dev"], solve-group = "default"}
+# Python-specific test environments
+py310 = {features = ["py310", "test"], solve-group = "default"}
+py311 = {features = ["py311", "test"], solve-group = "default"}
+py312 = {features = ["py312", "test"], solve-group = "default"}
+py313 = {features = ["py313", "test"], solve-group = "default"}
+# Specialized environments
+docs = {features = ["docs"], solve-group = "default"}
+lint = {features = ["lint"], solve-group = "default"}
+
+[tool.pixi.tasks]
+# Testing tasks - no need for install dependency, pixi handles editable install automatically
+test = "pytest tests/ -v"
+test-fast = "pytest tests/ -v -x --ff"
+test-ci = "pytest tests/ -s -n auto --cov=zfit2 --cov-report=xml --cov-report=term --durations=20 --timeout=3600"
+
+# Linting tasks
+pre-commit = "pre-commit run --all-files"
+format = "ruff format src/ tests/"
+lint = "ruff check src/ tests/"
+typecheck = "mypy src/"
+pylint = "pylint src/zfit2"
+
+# Documentation tasks
+docs-build = {cmd = "sphinx-build -W -b html docs docs/_build/html", cwd = "."}
+docs-linkcheck = {cmd = "sphinx-build -W -b linkcheck docs docs/_build/linkcheck", cwd = "."}
+docs-serve = {cmd = "python -m http.server 8000 --directory docs/_build/html", cwd = "."}
+
+# Utility tasks
+clean = "rm -rf build dist src/*.egg-info .coverage* htmlcov .pytest_cache .mypy_cache .ruff_cache"
+coverage-report = "python -m coverage report && python -m coverage html"
+build = "python -m build"
+info = "python -c 'import zfit2; print(f\"zfit2 {zfit2.__version__} from {zfit2.__file__}\")'"

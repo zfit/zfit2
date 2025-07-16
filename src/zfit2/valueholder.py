@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-from typing import Union
-
 import numpy as np
 
 
 class ValueHolder:
     """A dict-like class for storing numerical values (floats and arrays)."""
 
-    def __init__(self, values: dict[str, Union[float, np.ndarray]] | None = None):
+    def __init__(self, values: dict[str, float | np.ndarray] | None = None):
         self._values = {} if values is None else dict(values)
 
-    def __getitem__(self, key: str) -> Union[float, np.ndarray]:
+    def __getitem__(self, key: str) -> float | np.ndarray:
         return self._values[key]
 
-    def __setitem__(self, key: str, value: Union[float, np.ndarray]) -> None:
+    def __setitem__(self, key: str, value: float | np.ndarray) -> None:
         if not isinstance(value, float | np.ndarray):
             msg = f"Value must be float or numpy.ndarray, not {type(value)}"
             raise TypeError(msg)
@@ -37,3 +35,6 @@ class ValueHolder:
         merged = ValueHolder(self._values.copy())
         merged._values.update(other._values)
         return merged
+
+    def __array__(self) -> np.ndarray:
+        return np.asarray(self._values.values())
