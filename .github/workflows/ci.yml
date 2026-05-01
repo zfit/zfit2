@@ -25,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
       
-      - uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
@@ -39,7 +39,7 @@ jobs:
           echo "::add-matcher::$GITHUB_WORKSPACE/.github/matchers/pylint.json"
           pixi run -e lint pylint || true  # Allow pylint to fail for now
       
-      - uses: scientific-python/repo-review@v0.12.3
+      - uses: scientific-python/repo-review@v1.0.3
         with:
           plugins: sp-repo-review
 
@@ -134,7 +134,7 @@ jobs:
         with:
           fetch-depth: 0
       
-      - uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
@@ -159,7 +159,7 @@ jobs:
         run: pixi run -e py${{ matrix.python-version }} test-ci
       
       - name: Upload coverage data
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: matrix.runs-on == 'ubuntu-latest'
         with:
           name: coverage-py${{ matrix.python-version }}-${{ matrix.runs-on }}
@@ -178,14 +178,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       
-      - uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
           environments: default
       
       - name: Download all coverage data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           merge-multiple: true
@@ -196,7 +196,7 @@ jobs:
           pixi run coverage-report
       
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5.5.2
+        uses: codecov/codecov-action@v6.0.0
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
@@ -211,7 +211,7 @@ jobs:
         with:
           fetch-depth: 0
       
-      - uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           cache: true
