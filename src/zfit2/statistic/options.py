@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 
 import jax
 import jax.numpy as jnp
+from typing_extensions import Self
 
 T = TypeVar("T", bound="NLLOptions")
 
@@ -46,12 +47,12 @@ class NLLOptions:
             offset_config["start_value"] = jnp.asarray(offset_config["start_value"])
 
     def offset(
-        self: T,
+        self,
         method: str | Callable[[jnp.ndarray], jnp.ndarray],
         *,
         start_value: float = 0.0,
         force: bool = False,
-    ) -> T:
+    ) -> Self:
         """Configure offset method.
 
         Args:
@@ -101,7 +102,7 @@ class NLLOptions:
         new_instance._configured_methods = new_configured
         return new_instance
 
-    def sum(self: T, method: str = "standard", *, force: bool = False) -> T:
+    def sum(self, method: str = "standard", *, force: bool = False) -> Self:
         """Configure summation method.
 
         Args:
